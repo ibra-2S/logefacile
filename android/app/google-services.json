@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "344633483640",
+    "project_id": "logefacile-c0680",
+    "storage_bucket": "logefacile-c0680.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:344633483640:android:368318c5a3914dc404a88d",
+        "android_client_info": {
+          "package_name": "com.ibra2s.logefacile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB88orQkPy3RStiADW4tuaHUgPDzO0eZhM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
