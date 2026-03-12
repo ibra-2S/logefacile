@@ -80,7 +80,9 @@ final routeurApp = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.detailBien,
-        builder: (context, state) => const PropertyDetailScreen(),
+        builder:
+            (context, state) =>
+                PropertyDetailScreen(bienId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: AppRoutes.mesFavoris,

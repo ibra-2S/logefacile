@@ -8,7 +8,7 @@ import '../models/visit_request_model.dart';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // ── BIENS ────────────────────────────────────────────────────────────────
+  //BIENS
 
   // ajouter un nouveau bien
   Future<String> ajouterBien(PropertyModel bien) async {
@@ -80,17 +80,17 @@ class FirestoreService {
     });
   }
 
-  // ── FAVORIS ──────────────────────────────────────────────────────────────
+  //FAVORIS
 
   // ajouter un bien en favori
-  Future<void> ajouterFavori(String locataireId, String bienId) async {
-    final favId = '${locataireId}_$bienId';
+  Future<void> ajouterFavori(String locataireId, PropertyModel bien) async {
+    final favId = '${locataireId}_${bien.id}';
     await _db.collection('favorites').doc(favId).set({
       'tenantId': locataireId,
-      'propertyId': bienId,
+      'propertyId': bien.id,
       'savedAt': Timestamp.fromDate(DateTime.now()),
     });
-    await _db.collection('properties').doc(bienId).update({
+    await _db.collection('properties').doc(bien.id).update({
       'nombreFavoris': FieldValue.increment(1),
     });
   }
@@ -122,7 +122,7 @@ class FirestoreService {
         );
   }
 
-  // ── DEMANDES DE VISITE ───────────────────────────────────────────────────
+  //DEMANDES DE VISITE
 
   // créer une demande de visite
   Future<void> creerDemandeVisite(VisitRequestModel demande) async {
@@ -163,7 +163,7 @@ class FirestoreService {
         .map((s) => s.docs.map(VisitRequestModel.fromFirestore).toList());
   }
 
-  // ── AVIS ─────────────────────────────────────────────────────────────────
+  // AVIS
 
   // ajouter un avis
   Future<void> ajouterAvis(ReviewModel avis) async {
@@ -261,5 +261,19 @@ class FirestoreService {
         .orderBy('dateDernierMessage', descending: true)
         .snapshots()
         .map((s) => s.docs.map(ConversationModel.fromFirestore).toList());
+  }
+
+  // récupérer un bien par id en stream
+  Stream<PropertyModel?> getBienParId(String bienId) {
+    return _db
+        .collection('properties')
+        .doc(bienId)
+        .snapshots()
+        .map((doc) => doc.exists ? PropertyModel.fromFirestore(doc) : null);
+  }
+
+  // ajouter une demande de visite
+  Future<void> ajouterDemandeVisite(VisitRequestModel demande) async {
+    await _db.collection('visitRequests').add(demande.toMap());
   }
 }
