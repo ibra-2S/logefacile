@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/message_model.dart';
 import '../models/property_model.dart';
 import '../models/review_model.dart';
+import '../models/user_model.dart';
 import '../models/visit_request_model.dart';
 
 class FirestoreService {
@@ -275,5 +276,91 @@ class FirestoreService {
   // ajouter une demande de visite
   Future<void> ajouterDemandeVisite(VisitRequestModel demande) async {
     await _db.collection('visitRequests').add(demande.toMap());
+  }
+
+  //ALERTES
+
+  // créer une alerte de recherche
+  Future<void> creerAlerte({
+    required String locataireId,
+    required String ville,
+    double? prixMax,
+    String? type,
+  }) async {
+    await _db.collection('searchAlerts').add({
+      'locataireId': locataireId,
+      'ville': ville,
+      'prixMax': prixMax,
+      'type': type,
+      'dateCreation': Timestamp.fromDate(DateTime.now()),
+      'active': true,
+    });
+  }
+
+  // récupérer les alertes d'un locataire
+  Stream<List<Map<String, dynamic>>> alertesLocataire(String locataireId) {
+    return _db
+        .collection('searchAlerts')
+        .where('locataireId', isEqualTo: locataireId)
+        .where('active', isEqualTo: true)
+        .snapshots()
+        .map(
+          (s) =>
+              s.docs.map((doc) {
+                final data = doc.data();
+                data['id'] = doc.id;
+                return data;
+              }).toList(),
+        );
+  }
+
+  // supprimer une alerte
+  Future<void> supprimerAlerte(String alerteId) async {
+    await _db.collection('searchAlerts').doc(alerteId).delete();
+  }
+
+  //ADMIN
+
+  // récupérer tous les utilisateurs
+  Stream<List<UserModel>> tousLesUtilisateurs() {
+    return _db
+        .collection('users')
+        .orderBy('dateCreation', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(UserModel.fromFirestore).toList());
+  }
+
+  // modifier le statut d'un utilisateur
+  Future<void> modifierStatutUtilisateur(String uid, bool estActif) async {
+    await _db.collection('users').doc(uid).update({'estActif': estActif});
+  }
+
+  // supprimer un utilisateur
+  Future<void> supprimerUtilisateur(String uid) async {
+    await _db.collection('users').doc(uid).delete();
+  }
+
+  // récupérer tous les signalements
+  Stream<List<Map<String, dynamic>>> tousLesSignalements() {
+    return _db
+        .collection('reports')
+        .orderBy('dateCreation', descending: true)
+        .snapshots()
+        .map(
+          (s) =>
+              s.docs.map((doc) {
+                final data = doc.data();
+                data['id'] = doc.id;
+                return data;
+              }).toList(),
+        );
+  }
+
+  // marquer un signalement comme traité
+  Future<void> marquerSignalementTraite(String signalementId) async {
+    await _db.collection('reports').doc(signalementId).update({
+      'traite': true,
+      'dateMiseAJour': Timestamp.fromDate(DateTime.now()),
+    });
   }
 }

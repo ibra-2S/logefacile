@@ -10,6 +10,7 @@ import '../features/auth/providers/auth_provider.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/register_screen.dart';
 import '../features/auth/screens/role_selection_screen.dart';
+import '../features/chat/screens/chat_screen.dart';
 import '../features/chat/screens/conversations_screen.dart';
 import '../features/owner/screens/add_property_screen.dart';
 import '../features/owner/screens/my_properties_screen.dart';
@@ -105,6 +106,12 @@ final routeurApp = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.profil,
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.chat,
+        builder:
+            (context, state) =>
+                ChatScreen(convId: state.pathParameters['id'] ?? ''),
       ),
 
       // routes admin

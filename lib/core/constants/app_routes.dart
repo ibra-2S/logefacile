@@ -21,6 +21,8 @@ class AppRoutes {
   // commun
   static const conversations = '/conversations';
   static const profil = '/profil';
+  // commun
+  static const chat = '/conversations/:id';
 
   // admin
   static const tableauBordAdmin = '/admin';
