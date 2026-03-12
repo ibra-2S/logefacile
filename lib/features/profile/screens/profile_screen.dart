@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -157,7 +158,12 @@ class ProfileScreen extends ConsumerWidget {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton.icon(
-                        onPressed: () {},
+                        onPressed:
+                            () => _afficherModifierProfil(
+                              context,
+                              ref,
+                              utilisateur,
+                            ),
                         icon: const Icon(
                           Icons.edit_outlined,
                           color: Colors.white,
@@ -331,5 +337,101 @@ class ProfileScreen extends ConsumerWidget {
       default:
         return role;
     }
+  }
+
+  void _afficherModifierProfil(
+    BuildContext context,
+    WidgetRef ref,
+    utilisateur,
+  ) {
+    final nomCtrl = TextEditingController(text: utilisateur.nomComplet);
+    final telCtrl = TextEditingController(text: utilisateur.telephone ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (context) => Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Modifier le profil',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.texte,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nomCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Nom complet',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: telCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Téléphone',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(utilisateur.uid)
+                          .update({
+                            'nomComplet': nomCtrl.text.trim(),
+                            'telephone': telCtrl.text.trim(),
+                          });
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Profil mis à jour !'),
+                            backgroundColor: AppColors.succes,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.bleuFonce,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text(
+                      'Enregistrer',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
   }
 }
