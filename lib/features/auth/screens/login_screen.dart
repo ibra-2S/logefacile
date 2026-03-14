@@ -79,23 +79,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Column(
               children: [
-                const Text('🏠', style: TextStyle(fontSize: 64)),
-                const SizedBox(height: 12),
-                const Text(
-                  'LogeFacile',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                  ),
+                // ── Logo principal ──
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 110,
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
                 const Text(
                   'Connectez-vous à votre compte',
                   style: TextStyle(color: Colors.white60, fontSize: 14),
                 ),
                 const SizedBox(height: 40),
+
+                // ── Formulaire ──
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
