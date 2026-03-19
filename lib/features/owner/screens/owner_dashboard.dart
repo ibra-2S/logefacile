@@ -59,8 +59,9 @@ class OwnerDashboard extends ConsumerWidget {
                         (total, b) => total + b.nombreVues,
                       );
 
-                      // demandes en attente
-                      final demandesEnAttente =
+                      // demandes
+                      final demandesTotales = demandes.length;
+                      final demandesNonTraitees =
                           demandes.where((d) => d.estEnAttente).length;
 
                       return SingleChildScrollView(
@@ -97,7 +98,7 @@ class OwnerDashboard extends ConsumerWidget {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: _carteStatistique(
-                                    '$demandesEnAttente',
+                                    '$demandesTotales',
                                     'Demandes reçues',
                                     Icons.calendar_today_outlined,
                                     AppColors.bleuMoyen,
@@ -125,6 +126,21 @@ class OwnerDashboard extends ConsumerWidget {
                                     AppColors.violetAdmin,
                                   ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _carteStatistique(
+                                    '$demandesNonTraitees',
+                                    'Demandes en attente',
+                                    Icons.hourglass_empty_outlined,
+                                    AppColors.avertissement,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(child: SizedBox()),
                               ],
                             ),
                             const SizedBox(height: 28),
@@ -164,7 +180,6 @@ class OwnerDashboard extends ConsumerWidget {
                               titre: 'Demandes de visite',
                               description: 'Voir et gérer les demandes reçues',
                               couleur: AppColors.tealLocataire,
-                              badge: demandesEnAttente,
                               onTap:
                                   () => context.push(AppRoutes.demandesVisite),
                             ),
@@ -178,41 +193,6 @@ class OwnerDashboard extends ConsumerWidget {
                               couleur: AppColors.violetAdmin,
                               onTap:
                                   () => context.push(AppRoutes.conversations),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // déconnexion
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () async {
-                                  await ref
-                                      .read(authNotifierProvider.notifier)
-                                      .deconnecter();
-                                  if (context.mounted) {
-                                    context.go(AppRoutes.connexion);
-                                  }
-                                },
-                                icon: const Icon(
-                                  Icons.logout,
-                                  color: AppColors.erreur,
-                                ),
-                                label: const Text(
-                                  'Se déconnecter',
-                                  style: TextStyle(color: AppColors.erreur),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: AppColors.erreur,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                ),
-                              ),
                             ),
                           ],
                         ),

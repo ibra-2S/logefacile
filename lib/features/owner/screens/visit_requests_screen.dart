@@ -39,7 +39,15 @@ class VisitRequestsScreen extends ConsumerWidget {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final demandes = snapshot.data ?? [];
+                  // filtre : cacher les demandes annulées qui n'étaient pas acceptées
+                  final demandes =
+                      (snapshot.data ?? [])
+                          .where(
+                            (d) =>
+                                d.statut != StatutDemande.annulee ||
+                                d.etaitAcceptee,
+                          )
+                          .toList();
 
                   if (demandes.isEmpty) {
                     return const Center(
@@ -124,6 +132,55 @@ class _CarteDemande extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+
+          // nom du locataire
+          if (demande.nomLocataire.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.person_outline,
+                  size: 16,
+                  color: AppColors.bleuFonce,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Locataire : ${demande.nomLocataire}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.texte,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+
+          // titre du bien
+          if (demande.titreBien.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.home_outlined,
+                  size: 16,
+                  color: AppColors.bleuFonce,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Bien : ${demande.titreBien}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondaire,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
 
           // date proposée
           Row(
@@ -266,7 +323,7 @@ class _CarteDemande extends StatelessWidget {
         break;
       case StatutDemande.annulee:
         couleur = AppColors.grisMoyen;
-        label = '🚫 Annulée';
+        label = demande.etaitAcceptee ? '🚫 Visite annulée' : '🚫 Annulée';
         break;
     }
     return Container(

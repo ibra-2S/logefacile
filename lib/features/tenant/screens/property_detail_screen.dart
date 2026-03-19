@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/models/property_model.dart';
@@ -53,6 +55,15 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     });
   }
 
+  Future<String> _obtenirNomProprietaire(String uid) async {
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    if (doc.exists) {
+      return doc.data()?['nomComplet'] ?? '';
+    }
+    return '';
+  }
+
   Future<void> _demanderVisite(PropertyModel bien) async {
     final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
     if (utilisateur == null) return;
@@ -75,6 +86,9 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
       dateCreation: DateTime.now(),
       dateMiseAJour: DateTime.now(),
       statut: StatutDemande.enAttente,
+      nomLocataire: utilisateur.nomComplet,
+      titreBien: bien.titre,
+      nomProprietaire: await _obtenirNomProprietaire(bien.proprietaireId),
     );
 
     await _firestoreService.ajouterDemandeVisite(demande);
@@ -102,6 +116,12 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
           if (bien == null) {
             return const Center(child: Text('Bien introuvable'));
           }
+
+          final position = LatLng(
+            bien.localisation.latitude,
+            bien.localisation.longitude,
+          );
+
           return CustomScrollView(
             slivers: [
               // app bar avec image
@@ -179,9 +199,9 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
+                      const Text(
                         'par mois',
-                        style: const TextStyle(color: AppColors.texteLeger),
+                        style: TextStyle(color: AppColors.texteLeger),
                       ),
                       const SizedBox(height: 12),
 
@@ -278,8 +298,42 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                                   )
                                   .toList(),
                         ),
-                        const SizedBox(height: 80),
+                        const SizedBox(height: 20),
                       ],
+
+                      // ── CARTE GOOGLE MAPS ──
+                      const Text(
+                        'Localisation',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.texte,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          height: 200,
+                          child: GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: position,
+                              zoom: 15,
+                            ),
+                            markers: {
+                              Marker(
+                                markerId: const MarkerId('bien'),
+                                position: position,
+                                infoWindow: InfoWindow(title: bien.titre),
+                              ),
+                            },
+                            zoomControlsEnabled: false,
+                            myLocationButtonEnabled: false,
+                            liteModeEnabled: false,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 80),
                     ],
                   ),
                 ),

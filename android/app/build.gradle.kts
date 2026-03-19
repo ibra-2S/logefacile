@@ -10,6 +10,7 @@ plugins {
 
 android {
     namespace = "com.ibra2s.logefacile"
+    useLibrary("org.apache.http.legacy")
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

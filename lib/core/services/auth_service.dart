@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // utilisateur connecté en ce moment
   User? get utilisateurActuel => _auth.currentUser;
@@ -71,8 +73,54 @@ class AuthService {
     }
   }
 
+  // connexion avec Google
+  Future<UserModel?> connecterAvecGoogle({
+    UserRole role = UserRole.locataire,
+  }) async {
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null;
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final resultat = await _auth.signInWithCredential(credential);
+      final uid = resultat.user!.uid;
+
+      // vérifier si l'utilisateur existe déjà dans Firestore
+      final docExistant = await _db.collection('users').doc(uid).get();
+
+      if (!docExistant.exists) {
+        // premier login Google — créer le profil
+        final nouvelUtilisateur = UserModel(
+          uid: uid,
+          email: resultat.user!.email ?? '',
+          nomComplet: resultat.user!.displayName ?? '',
+          role: role,
+          photoUrl: resultat.user!.photoURL,
+          dateCreation: DateTime.now(),
+          derniereCo: DateTime.now(),
+        );
+        await _db.collection('users').doc(uid).set(nouvelUtilisateur.toMap());
+        return nouvelUtilisateur;
+      } else {
+        // utilisateur existant — mise à jour dernière connexion
+        await _db.collection('users').doc(uid).update({
+          'derniereCo': Timestamp.fromDate(DateTime.now()),
+        });
+        return await recupererUtilisateur(uid);
+      }
+    } catch (e) {
+      throw _gererErreur(e);
+    }
+  }
+
   // déconnexion
   Future<void> deconnecter() async {
+    await _googleSignIn.signOut();
     await _auth.signOut();
   }
 

@@ -1,17 +1,89 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  static const String _cloudName = 'dfxnwioow';
+  static const String _uploadPreset = 'g1qqzyep';
+
+  bool _uploadPhoto = false;
+
+  Future<void> _changerPhoto() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (image == null) return;
+
+    final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
+    if (utilisateur == null) return;
+
+    setState(() => _uploadPhoto = true);
+
+    try {
+      // upload sur Cloudinary
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload'),
+      );
+      request.fields['upload_preset'] = _uploadPreset;
+      request.files.add(await http.MultipartFile.fromPath('file', image.path));
+
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonData = jsonDecode(responseData);
+
+      if (response.statusCode == 200) {
+        final photoUrl = jsonData['secure_url'] as String;
+
+        // mise à jour dans Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(utilisateur.uid)
+            .update({'photoUrl': photoUrl});
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo de profil mise à jour !'),
+              backgroundColor: AppColors.succes,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors du chargement de la photo.'),
+            backgroundColor: AppColors.erreur,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _uploadPhoto = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final utilisateur = ref.watch(utilisateurActuelProvider).asData?.value;
 
     return Scaffold(
@@ -35,49 +107,62 @@ class ProfileScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    // photo de profil
+                    // photo de profil cliquable
                     Center(
-                      child: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 52,
-                            backgroundColor: AppColors.bleuClair,
-                            backgroundImage:
-                                utilisateur.photoUrl != null
-                                    ? NetworkImage(utilisateur.photoUrl!)
-                                    : null,
-                            child:
-                                utilisateur.photoUrl == null
-                                    ? Text(
-                                      utilisateur.nomComplet.isNotEmpty
-                                          ? utilisateur.nomComplet[0]
-                                              .toUpperCase()
-                                          : '?',
-                                      style: const TextStyle(
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.bleuFonce,
-                                      ),
-                                    )
-                                    : null,
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: AppColors.bleuFonce,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 16,
+                      child: GestureDetector(
+                        onTap: _changerPhoto,
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 52,
+                              backgroundColor: AppColors.bleuClair,
+                              backgroundImage:
+                                  utilisateur.photoUrl != null
+                                      ? NetworkImage(utilisateur.photoUrl!)
+                                      : null,
+                              child:
+                                  utilisateur.photoUrl == null
+                                      ? Text(
+                                        utilisateur.nomComplet.isNotEmpty
+                                            ? utilisateur.nomComplet[0]
+                                                .toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                          fontSize: 40,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.bleuFonce,
+                                        ),
+                                      )
+                                      : null,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.bleuFonce,
+                                  shape: BoxShape.circle,
+                                ),
+                                child:
+                                    _uploadPhoto
+                                        ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                        : const Icon(
+                                          Icons.camera_alt,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -90,7 +175,6 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    // badge du rôle
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -133,7 +217,6 @@ class ProfileScreen extends ConsumerWidget {
                     ]),
                     const SizedBox(height: 16),
 
-                    // section locataire — pièce d'identité
                     if (utilisateur.estLocataire) ...[
                       _sectionInfo('Documents', [
                         _ligneInfo(

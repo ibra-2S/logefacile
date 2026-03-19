@@ -15,6 +15,14 @@ class VisitRequestModel {
   final DateTime dateCreation;
   final DateTime dateMiseAJour;
 
+  // champs affichage
+  final String nomLocataire;
+  final String titreBien;
+  final String nomProprietaire;
+
+  // champ pour savoir si la demande était acceptée avant annulation
+  final bool etaitAcceptee;
+
   VisitRequestModel({
     required this.id,
     required this.bienId,
@@ -26,6 +34,10 @@ class VisitRequestModel {
     this.raisonRefus,
     required this.dateCreation,
     required this.dateMiseAJour,
+    this.nomLocataire = '',
+    this.titreBien = '',
+    this.nomProprietaire = '',
+    this.etaitAcceptee = false,
   });
 
   factory VisitRequestModel.fromFirestore(DocumentSnapshot doc) {
@@ -37,13 +49,17 @@ class VisitRequestModel {
       proprietaireId: d['proprietaireId'] ?? '',
       dateProposee: (d['dateProposee'] as Timestamp).toDate(),
       statut: StatutDemande.values.firstWhere(
-        (s) => s.name == d['statut'],
+            (s) => s.name == d['statut'],
         orElse: () => StatutDemande.enAttente,
       ),
       message: d['message'],
       raisonRefus: d['raisonRefus'],
       dateCreation: (d['dateCreation'] as Timestamp).toDate(),
       dateMiseAJour: (d['dateMiseAJour'] as Timestamp).toDate(),
+      nomLocataire: d['nomLocataire'] ?? '',
+      titreBien: d['titreBien'] ?? '',
+      nomProprietaire: d['nomProprietaire'] ?? '',
+      etaitAcceptee: d['etaitAcceptee'] ?? false,
     );
   }
 
@@ -58,6 +74,10 @@ class VisitRequestModel {
       'raisonRefus': raisonRefus,
       'dateCreation': Timestamp.fromDate(dateCreation),
       'dateMiseAJour': Timestamp.fromDate(dateMiseAJour),
+      'nomLocataire': nomLocataire,
+      'titreBien': titreBien,
+      'nomProprietaire': nomProprietaire,
+      'etaitAcceptee': etaitAcceptee,
     };
   }
 

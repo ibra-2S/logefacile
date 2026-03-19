@@ -50,7 +50,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       setState(() => _erreur = e.toString());
     } finally {
-      setState(() => _chargement = false);
+      if (mounted) setState(() => _chargement = false);
+    }
+  }
+
+  Future<void> _seConnecterGoogle() async {
+    setState(() => _chargement = true);
+    try {
+      await ref.read(authNotifierProvider.notifier).connecterAvecGoogle();
+      if (!mounted) return;
+      final utilisateur = ref.read(authNotifierProvider).asData?.value;
+      if (utilisateur != null) _redirigerSelonRole(utilisateur.role);
+    } catch (e) {
+      setState(() => _erreur = e.toString());
+    } finally {
+      if (mounted) setState(() => _chargement = false);
     }
   }
 
@@ -72,7 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A237E),
+      backgroundColor: const Color(0xFF3E7EC6),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -82,7 +96,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // ── Logo principal ──
                 Image.asset(
                   'assets/images/logo.png',
-                  height: 110,
+                  height: 200,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 10),
@@ -168,7 +182,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: ElevatedButton(
                           onPressed: _chargement ? null : _seConnecter,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1A237E),
+                            backgroundColor: const Color(0xFF175295),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -192,6 +206,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                // ── Bouton Google ──
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: Colors.white30)),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'ou',
+                        style: TextStyle(color: Colors.white60),
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: Colors.white30)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _chargement ? null : _seConnecterGoogle,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: Image.network(
+                      'https://www.google.com/favicon.ico',
+                      height: 20,
+                    ),
+                    label: const Text(
+                      'Continuer avec Google',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

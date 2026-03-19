@@ -24,7 +24,7 @@ class LogeFacile extends ConsumerWidget {
       title: 'LogeFacile',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF1A237E),
+        colorSchemeSeed: const Color(0xFF6F80FA),
         useMaterial3: true,
         fontFamily: 'Poppins',
       ),

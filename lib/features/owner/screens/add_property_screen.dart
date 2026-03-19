@@ -1,7 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/models/property_model.dart';
@@ -29,7 +34,16 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   bool _chargement = false;
   String? _erreur;
 
+  // photos sélectionnées
+  final List<File> _photosSelectionnees = [];
+  bool _uploadEnCours = false;
+
+  // Cloudinary config
+  static const String _cloudName = 'dfxnwioow';
+  static const String _uploadPreset = 'g1qqzyep';
+
   final _firestoreService = FirestoreService();
+  final _imagePicker = ImagePicker();
 
   final List<String> _equipements = [
     'wifi',
@@ -54,6 +68,63 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     super.dispose();
   }
 
+  // sélectionner des photos depuis la galerie
+  Future<void> _selectionnerPhotos() async {
+    if (_photosSelectionnees.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maximum 5 photos autorisées'),
+          backgroundColor: AppColors.avertissement,
+        ),
+      );
+      return;
+    }
+
+    final restantes = 5 - _photosSelectionnees.length;
+    final images = await _imagePicker.pickMultiImage(limit: restantes);
+
+    if (images.isNotEmpty) {
+      setState(() {
+        for (final img in images) {
+          if (_photosSelectionnees.length < 5) {
+            _photosSelectionnees.add(File(img.path));
+          }
+        }
+      });
+    }
+  }
+
+  // supprimer une photo
+  void _supprimerPhoto(int index) {
+    setState(() => _photosSelectionnees.removeAt(index));
+  }
+
+  // uploader les photos sur Cloudinary
+  Future<List<String>> _uploaderPhotos() async {
+    final urls = <String>[];
+    setState(() => _uploadEnCours = true);
+
+    for (final photo in _photosSelectionnees) {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload'),
+      );
+      request.fields['upload_preset'] = _uploadPreset;
+      request.files.add(await http.MultipartFile.fromPath('file', photo.path));
+
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonData = jsonDecode(responseData);
+
+      if (response.statusCode == 200) {
+        urls.add(jsonData['secure_url'] as String);
+      }
+    }
+
+    setState(() => _uploadEnCours = false);
+    return urls;
+  }
+
   Future<void> _publierBien() async {
     if (_titreCtrl.text.trim().isEmpty ||
         _adresseCtrl.text.trim().isEmpty ||
@@ -70,13 +141,18 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       _erreur = null;
     });
 
-    // on capture le contexte avant le await
     final messager = ScaffoldMessenger.of(context);
     final nav = GoRouter.of(context);
 
     try {
       final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
       if (utilisateur == null) return;
+
+      // upload des photos si sélectionnées
+      List<String> photosUrls = [];
+      if (_photosSelectionnees.isNotEmpty) {
+        photosUrls = await _uploaderPhotos();
+      }
 
       final bien = PropertyModel(
         id: '',
@@ -97,6 +173,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                 : _quartierCtrl.text.trim(),
         localisation: const GeoPoint(9.5370, -13.6773),
         equipements: _equipementsSelectionnes,
+        photos: photosUrls,
         datePublication: DateTime.now(),
         dateMiseAJour: DateTime.now(),
       );
@@ -190,6 +267,140 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                     }).toList(),
               ),
             ),
+            const SizedBox(height: 20),
+
+            // ── SECTION PHOTOS ──
+            _titreSectionn('Photos du logement (max 5)'),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 110,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  // bouton ajouter photo
+                  if (_photosSelectionnees.length < 5)
+                    GestureDetector(
+                      onTap: _selectionnerPhotos,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        margin: const EdgeInsets.only(right: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.grisClair,
+                            style: BorderStyle.solid,
+                          ),
+                        ),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_photo_alternate_outlined,
+                              color: AppColors.bleuFonce,
+                              size: 32,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Ajouter',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.bleuFonce,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // photos sélectionnées
+                  ..._photosSelectionnees.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final photo = entry.value;
+                    return Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          margin: const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            image: DecorationImage(
+                              image: FileImage(photo),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 14,
+                          child: GestureDetector(
+                            onTap: () => _supprimerPhoto(index),
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (index == 0)
+                          Positioned(
+                            bottom: 4,
+                            left: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.bleuFonce.withValues(
+                                  alpha: 0.8,
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'Principale',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  }),
+                ],
+              ),
+            ),
+            if (_uploadEnCours) ...[
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Upload des photos en cours...',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondaire,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 20),
 
             // informations de base

@@ -59,6 +59,19 @@ class AuthNotifier extends Notifier<AsyncValue<UserModel?>> {
     }
   }
 
+  // connexion avec Google
+  Future<void> connecterAvecGoogle({UserRole role = UserRole.locataire}) async {
+    state = const AsyncValue.loading();
+    try {
+      final utilisateur = await ref
+          .read(authServiceProvider)
+          .connecterAvecGoogle(role: role);
+      state = AsyncValue.data(utilisateur);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
   Future<void> deconnecter() async {
     await ref.read(authServiceProvider).deconnecter();
     state = const AsyncValue.data(null);

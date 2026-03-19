@@ -125,6 +125,55 @@ class _CarteDemande extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
+          // titre du bien
+          if (demande.titreBien.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.home_outlined,
+                  size: 16,
+                  color: AppColors.bleuFonce,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Bien : ${demande.titreBien}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.texte,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+
+          // nom du propriétaire
+          if (demande.nomProprietaire.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.person_outline,
+                  size: 16,
+                  color: AppColors.bleuFonce,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Propriétaire : ${demande.nomProprietaire}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondaire,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+
           // date proposée
           Row(
             children: [
@@ -164,22 +213,60 @@ class _CarteDemande extends StatelessWidget {
             ],
           ),
 
-          // bouton annuler si en attente
-          if (demande.estEnAttente) ...[
+          // raison du refus
+          if (demande.estRefusee &&
+              demande.raisonRefus != null &&
+              demande.raisonRefus!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.erreur.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.erreur.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: AppColors.erreur,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Motif : ${demande.raisonRefus}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.erreur,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // bouton annuler si en attente ou acceptée
+          if (demande.estEnAttente || demande.estAcceptee) ...[
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () => _annuler(),
+                onPressed: () => _annuler(context),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.erreur),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  'Annuler la demande',
-                  style: TextStyle(color: AppColors.erreur),
+                child: Text(
+                  demande.estAcceptee
+                      ? 'Annuler le rendez-vous'
+                      : 'Annuler la demande',
+                  style: const TextStyle(color: AppColors.erreur),
                 ),
               ),
             ),
@@ -189,11 +276,53 @@ class _CarteDemande extends StatelessWidget {
     );
   }
 
-  Future<void> _annuler() async {
-    await firestoreService.mettreAJourStatutDemande(
-      demande.id,
-      StatutDemande.annulee,
+  Future<void> _annuler(BuildContext context) async {
+    // confirmation avant annulation
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(
+              demande.estAcceptee
+                  ? 'Annuler le rendez-vous ?'
+                  : 'Annuler la demande ?',
+            ),
+            content: Text(
+              demande.estAcceptee
+                  ? 'Le propriétaire sera informé de l\'annulation du rendez-vous.'
+                  : 'Cette demande sera supprimée.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Non'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Oui, annuler',
+                  style: TextStyle(color: AppColors.erreur),
+                ),
+              ),
+            ],
+          ),
     );
+
+    if (confirme != true) return;
+
+    if (demande.estAcceptee) {
+      // rendez-vous accepté → marquer comme annulé avec etaitAcceptee=true
+      // le propriétaire verra la demande comme annulée
+      await firestoreService.mettreAJourStatutDemande(
+        demande.id,
+        StatutDemande.annulee,
+        etaitAcceptee: true,
+      );
+    } else {
+      // demande en attente → supprimer complètement
+      // le propriétaire ne verra plus rien
+      await firestoreService.supprimerDemande(demande.id);
+    }
   }
 
   String _formaterDate(DateTime date) {

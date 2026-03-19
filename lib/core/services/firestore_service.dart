@@ -135,13 +135,20 @@ class FirestoreService {
     String demandeId,
     StatutDemande statut, {
     String? raisonRefus,
+    bool etaitAcceptee = false,
   }) async {
     final Map<String, dynamic> donnees = {
       'statut': statut.name,
       'dateMiseAJour': Timestamp.fromDate(DateTime.now()),
+      'etaitAcceptee': etaitAcceptee,
     };
     if (raisonRefus != null) donnees['raisonRefus'] = raisonRefus;
     await _db.collection('visitRequests').doc(demandeId).update(donnees);
+  }
+
+  // supprimer une demande de visite
+  Future<void> supprimerDemande(String demandeId) async {
+    await _db.collection('visitRequests').doc(demandeId).delete();
   }
 
   // demandes reçues par un propriétaire
