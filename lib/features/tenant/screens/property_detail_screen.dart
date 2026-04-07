@@ -2,9 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+//import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_routes.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/models/visit_request_model.dart';
 import '../../../core/services/firestore_service.dart';
@@ -55,13 +57,16 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     });
   }
 
-  Future<String> _obtenirNomProprietaire(String uid) async {
+  Future<Map<String, String>> _obtenirInfosProprietaire(String uid) async {
     final doc =
         await FirebaseFirestore.instance.collection('users').doc(uid).get();
     if (doc.exists) {
-      return doc.data()?['nomComplet'] ?? '';
+      return {
+        'nomComplet': doc.data()?['nomComplet'] ?? '',
+        'photoUrl': doc.data()?['photoUrl'] ?? '',
+      };
     }
-    return '';
+    return {'nomComplet': '', 'photoUrl': ''};
   }
 
   Future<void> _demanderVisite(PropertyModel bien) async {
@@ -77,6 +82,10 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     if (dateChoisie == null) return;
     if (!context.mounted) return;
 
+    final infosProprietaire = await _obtenirInfosProprietaire(
+      bien.proprietaireId,
+    );
+
     final demande = VisitRequestModel(
       id: '',
       bienId: bien.id,
@@ -88,7 +97,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
       statut: StatutDemande.enAttente,
       nomLocataire: utilisateur.nomComplet,
       titreBien: bien.titre,
-      nomProprietaire: await _obtenirNomProprietaire(bien.proprietaireId),
+      nomProprietaire: infosProprietaire['nomComplet'] ?? '',
     );
 
     await _firestoreService.ajouterDemandeVisite(demande);
@@ -100,6 +109,29 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
         backgroundColor: AppColors.succes,
       ),
     );
+  }
+
+  Future<void> _contacterProprietaire(PropertyModel bien) async {
+    final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
+    if (utilisateur == null) return;
+
+    final infosProprietaire = await _obtenirInfosProprietaire(
+      bien.proprietaireId,
+    );
+
+    final convId = await _firestoreService.creerOuRecupererConversation(
+      utilisateur.uid,
+      bien.proprietaireId,
+      bien.id,
+      titreBien: bien.titre,
+      nomLocataire: utilisateur.nomComplet,
+      nomProprietaire: infosProprietaire['nomComplet'] ?? '',
+      photoLocataire: utilisateur.photoUrl,
+      photoProprietaire: infosProprietaire['photoUrl'],
+    );
+
+    if (!context.mounted) return;
+    context.push(AppRoutes.chat.replaceAll(':id', convId));
   }
 
   @override
@@ -117,10 +149,10 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
             return const Center(child: Text('Bien introuvable'));
           }
 
-          final position = LatLng(
-            bien.localisation.latitude,
-            bien.localisation.longitude,
-          );
+          // final position = LatLng(
+          //   bien.localisation.latitude,
+          //   bien.localisation.longitude,
+          // );
 
           return CustomScrollView(
             slivers: [
@@ -301,38 +333,38 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                         const SizedBox(height: 20),
                       ],
 
-                      // ── CARTE GOOGLE MAPS ──
-                      const Text(
-                        'Localisation',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.texte,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: SizedBox(
-                          height: 200,
-                          child: GoogleMap(
-                            initialCameraPosition: CameraPosition(
-                              target: position,
-                              zoom: 15,
-                            ),
-                            markers: {
-                              Marker(
-                                markerId: const MarkerId('bien'),
-                                position: position,
-                                infoWindow: InfoWindow(title: bien.titre),
-                              ),
-                            },
-                            zoomControlsEnabled: false,
-                            myLocationButtonEnabled: false,
-                            liteModeEnabled: false,
-                          ),
-                        ),
-                      ),
+                      // ── CARTE GOOGLE MAPS (commentée temporairement) ──
+                      // const Text(
+                      //   'Localisation',
+                      //   style: TextStyle(
+                      //     fontSize: 16,
+                      //     fontWeight: FontWeight.w700,
+                      //     color: AppColors.texte,
+                      //   ),
+                      // ),
+                      // const SizedBox(height: 10),
+                      // ClipRRect(
+                      //   borderRadius: BorderRadius.circular(16),
+                      //   child: SizedBox(
+                      //     height: 200,
+                      //     child: GoogleMap(
+                      //       initialCameraPosition: CameraPosition(
+                      //         target: position,
+                      //         zoom: 15,
+                      //       ),
+                      //       markers: {
+                      //         Marker(
+                      //           markerId: const MarkerId('bien'),
+                      //           position: position,
+                      //           infoWindow: InfoWindow(title: bien.titre),
+                      //         ),
+                      //       },
+                      //       zoomControlsEnabled: false,
+                      //       myLocationButtonEnabled: false,
+                      //       liteModeEnabled: false,
+                      //     ),
+                      //   ),
+                      // ),
                       const SizedBox(height: 80),
                     ],
                   ),
@@ -343,7 +375,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
         },
       ),
 
-      // bouton demande visite
+      // boutons en bas
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -356,29 +388,69 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
             ),
           ],
         ),
-        child: ElevatedButton(
-          onPressed: () async {
-            final bien =
-                await _firestoreService.getBienParId(widget.bienId).first;
-            if (bien != null && context.mounted) {
-              _demanderVisite(bien);
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.bleuFonce,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        child: Row(
+          children: [
+            // bouton contacter
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final bien =
+                      await _firestoreService.getBienParId(widget.bienId).first;
+                  if (bien != null && context.mounted) {
+                    _contacterProprietaire(bien);
+                  }
+                },
+                icon: const Icon(
+                  Icons.chat_bubble_outline,
+                  color: AppColors.bleuFonce,
+                  size: 18,
+                ),
+                label: const Text(
+                  'Contacter',
+                  style: TextStyle(
+                    color: AppColors.bleuFonce,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.bleuFonce),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-          child: const Text(
-            'Demander une visite',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+            const SizedBox(width: 12),
+            // bouton demander visite
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: () async {
+                  final bien =
+                      await _firestoreService.getBienParId(widget.bienId).first;
+                  if (bien != null && context.mounted) {
+                    _demanderVisite(bien);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.bleuFonce,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text(
+                  'Demander une visite',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

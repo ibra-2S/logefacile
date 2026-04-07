@@ -27,7 +27,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // récupérer le rôle passé depuis l'écran de choix
     final extra = GoRouterState.of(context).extra;
     _role = extra is UserRole ? extra : UserRole.locataire;
   }
@@ -43,7 +42,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _sInscrire() async {
-    // vérifications de base
     if (_nomCtrl.text.trim().isEmpty ||
         _emailCtrl.text.trim().isEmpty ||
         _mdpCtrl.text.trim().isEmpty) {
@@ -83,26 +81,65 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           );
 
       if (!mounted) return;
-      _redirigerSelonRole(_role);
+
+      // afficher le dialogue de succès
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.mark_email_read_outlined,
+                    color: Colors.green,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Compte créé !',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Un email de confirmation a été envoyé à ${_emailCtrl.text.trim()}.\n\nVeuillez confirmer votre email avant de vous connecter.',
+                    style: const TextStyle(fontSize: 14, color: Colors.black54),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        context.go(AppRoutes.connexion);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A237E),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text(
+                        'Aller à la connexion',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      );
     } catch (e) {
       setState(() => _erreur = e.toString());
     } finally {
-      setState(() => _chargement = false);
-    }
-  }
-
-  void _redirigerSelonRole(UserRole role) {
-    switch (role) {
-      case UserRole.proprietaire:
-      case UserRole.agent:
-        context.go(AppRoutes.tableauBordProprietaire);
-        break;
-      case UserRole.locataire:
-        context.go(AppRoutes.rechercheLocataire);
-        break;
-      case UserRole.admin:
-        context.go(AppRoutes.tableauBordAdmin);
-        break;
+      if (mounted) setState(() => _chargement = false);
     }
   }
 
@@ -180,7 +217,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // champ mot de passe
                     const Text(
                       'Mot de passe *',
                       style: TextStyle(
@@ -206,7 +242,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // confirmation mot de passe
                     const Text(
                       'Confirmer le mot de passe *',
                       style: TextStyle(
@@ -221,18 +256,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       decoration: _styleChamp('Répétez votre mot de passe'),
                     ),
 
-                    // message d'erreur
                     if (_erreur != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _erreur!,
-                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.red.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _erreur!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
                     ],
 
                     const SizedBox(height: 20),
 
-                    // bouton inscription
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -263,7 +309,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ),
 
-              // lien vers connexion
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

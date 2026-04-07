@@ -19,6 +19,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _mdpVisible = false;
   bool _chargement = false;
   String? _erreur;
+  bool _emailNonVerifie = false;
 
   @override
   void dispose() {
@@ -31,6 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _chargement = true;
       _erreur = null;
+      _emailNonVerifie = false;
     });
 
     try {
@@ -47,6 +49,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (utilisateur != null) {
         _redirigerSelonRole(utilisateur.role);
       }
+    } catch (e) {
+      final erreur = e.toString();
+      setState(() {
+        _erreur = erreur;
+        // détecter si c'est l'erreur de vérification email
+        if (erreur.contains('confirmer votre email')) {
+          _emailNonVerifie = true;
+        }
+      });
+    } finally {
+      if (mounted) setState(() => _chargement = false);
+    }
+  }
+
+  Future<void> _renvoyerEmail() async {
+    if (_emailCtrl.text.trim().isEmpty || _mdpCtrl.text.trim().isEmpty) {
+      setState(() => _erreur = 'Entrez votre email et mot de passe d\'abord.');
+      return;
+    }
+
+    setState(() => _chargement = true);
+    try {
+      await ref
+          .read(authServiceProvider)
+          .renvoyerEmailVerification(
+            _emailCtrl.text.trim(),
+            _mdpCtrl.text.trim(),
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email de vérification renvoyé !'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
       setState(() => _erreur = e.toString());
     } finally {
@@ -65,6 +102,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() => _erreur = e.toString());
     } finally {
       if (mounted) setState(() => _chargement = false);
+    }
+  }
+
+  Future<void> _motDePasseOublie() async {
+    if (_emailCtrl.text.trim().isEmpty) {
+      setState(() => _erreur = 'Entrez votre email d\'abord.');
+      return;
+    }
+    try {
+      await ref
+          .read(authServiceProvider)
+          .reinitialiserMotDePasse(_emailCtrl.text.trim());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email de réinitialisation envoyé !'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      setState(() => _erreur = e.toString());
     }
   }
 
@@ -158,18 +216,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       if (_erreur != null) ...[
                         const SizedBox(height: 12),
-                        Text(
-                          _erreur!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 13,
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.red.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _erreur!,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              // bouton renvoyer email si email non vérifié
+                              if (_emailNonVerifie) ...[
+                                const SizedBox(height: 8),
+                                GestureDetector(
+                                  onTap: _renvoyerEmail,
+                                  child: const Text(
+                                    'Renvoyer l\'email de confirmation →',
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ],
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {},
+                          onPressed: _motDePasseOublie,
                           child: const Text(
                             'Mot de passe oublié ?',
                             style: TextStyle(fontSize: 12),
@@ -206,8 +295,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+
                 // ── Bouton Google ──
-                const SizedBox(height: 12),
                 Row(
                   children: [
                     const Expanded(child: Divider(color: Colors.white30)),

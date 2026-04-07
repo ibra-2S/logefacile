@@ -27,6 +27,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  // marquer les messages non lus comme lus
+  Future<void> _marquerMessagesLus(
+    String monUid,
+    List<MessageModel> messages,
+  ) async {
+    for (final msg in messages) {
+      if (!msg.estLu && msg.expediteurId != monUid) {
+        await _firestoreService.marquerMessageLu(widget.convId, msg.id);
+      }
+    }
+    // réinitialiser le compteur de messages non lus
+    await _firestoreService.reinitialiserMessagesNonLus(widget.convId, monUid);
+  }
+
   Future<void> _envoyerMessage() async {
     if (_messageCtrl.text.trim().isEmpty) return;
 
@@ -95,6 +109,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
                         final messages = snapshot.data ?? [];
 
+                        // marquer les messages reçus comme lus
+                        if (messages.isNotEmpty) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _marquerMessagesLus(utilisateur.uid, messages);
+                          });
+                        }
+
                         if (messages.isEmpty) {
                           return const Center(
                             child: Text(
@@ -104,6 +125,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           );
                         }
 
+                        // scroller vers le bas automatiquement
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_scrollCtrl.hasClients) {
+                            _scrollCtrl.jumpTo(
+                              _scrollCtrl.position.maxScrollExtent,
+                            );
+                          }
+                        });
+
                         return ListView.builder(
                           controller: _scrollCtrl,
                           padding: const EdgeInsets.all(16),
@@ -111,7 +141,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           itemBuilder: (context, index) {
                             final msg = messages[index];
                             final estMoi = msg.expediteurId == utilisateur.uid;
-                            return _BullMessage(message: msg, estMoi: estMoi);
+                            // afficher "Vu" uniquement sur le dernier message envoyé
+                            final estDernierMessage =
+                                index == messages.length - 1;
+                            return _BullMessage(
+                              message: msg,
+                              estMoi: estMoi,
+                              afficherStatut: estMoi && estDernierMessage,
+                            );
                           },
                         );
                       },
@@ -184,8 +221,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 class _BullMessage extends StatelessWidget {
   final MessageModel message;
   final bool estMoi;
+  final bool afficherStatut;
 
-  const _BullMessage({required this.message, required this.estMoi});
+  const _BullMessage({
+    required this.message,
+    required this.estMoi,
+    this.afficherStatut = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -225,16 +267,37 @@ class _BullMessage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              '${message.dateEnvoi.hour.toString().padLeft(2, '0')}:'
-              '${message.dateEnvoi.minute.toString().padLeft(2, '0')}',
-              style: TextStyle(
-                fontSize: 11,
-                color:
-                    estMoi
-                        ? Colors.white.withValues(alpha: 0.7)
-                        : AppColors.texteLeger,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${message.dateEnvoi.hour.toString().padLeft(2, '0')}:'
+                  '${message.dateEnvoi.minute.toString().padLeft(2, '0')}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color:
+                        estMoi
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : AppColors.texteLeger,
+                  ),
+                ),
+                // statut "Vu" ou "Envoyé" sur le dernier message
+                if (estMoi && afficherStatut) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    message.estLu ? 'Vu' : '✓',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight:
+                          message.estLu ? FontWeight.w700 : FontWeight.normal,
+                      color:
+                          message.estLu
+                              ? Colors.greenAccent
+                              : Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),

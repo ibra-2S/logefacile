@@ -54,6 +54,10 @@ class ConversationModel {
   final String dernierMessage;
   final DateTime dateDernierMessage;
   final Map<String, int> messagesNonLus;
+  final String titreBien;
+  // noms et photos par uid de participant
+  final Map<String, String> nomParticipant;
+  final Map<String, String> photoParticipant;
 
   ConversationModel({
     required this.id,
@@ -62,7 +66,29 @@ class ConversationModel {
     required this.dernierMessage,
     required this.dateDernierMessage,
     this.messagesNonLus = const {},
+    this.titreBien = '',
+    this.nomParticipant = const {},
+    this.photoParticipant = const {},
   });
+
+  // obtenir le nom de l'interlocuteur (pas moi)
+  String nomInterlocuteur(String monUid) {
+    final autreUid = participants.firstWhere(
+      (p) => p != monUid,
+      orElse: () => '',
+    );
+    return nomParticipant[autreUid] ?? '';
+  }
+
+  // obtenir la photo de l'interlocuteur
+  String? photoInterlocuteur(String monUid) {
+    final autreUid = participants.firstWhere(
+      (p) => p != monUid,
+      orElse: () => '',
+    );
+    final photo = photoParticipant[autreUid] ?? '';
+    return photo.isEmpty ? null : photo;
+  }
 
   factory ConversationModel.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -73,6 +99,9 @@ class ConversationModel {
       dernierMessage: d['dernierMessage'] ?? '',
       dateDernierMessage: (d['dateDernierMessage'] as Timestamp).toDate(),
       messagesNonLus: Map<String, int>.from(d['messagesNonLus'] ?? {}),
+      titreBien: d['titreBien'] ?? '',
+      nomParticipant: Map<String, String>.from(d['nomParticipant'] ?? {}),
+      photoParticipant: Map<String, String>.from(d['photoParticipant'] ?? {}),
     );
   }
 
@@ -83,6 +112,9 @@ class ConversationModel {
       'dernierMessage': dernierMessage,
       'dateDernierMessage': Timestamp.fromDate(dateDernierMessage),
       'messagesNonLus': messagesNonLus,
+      'titreBien': titreBien,
+      'nomParticipant': nomParticipant,
+      'photoParticipant': photoParticipant,
     };
   }
 }

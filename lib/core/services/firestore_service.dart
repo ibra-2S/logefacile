@@ -176,7 +176,6 @@ class FirestoreService {
   // ajouter un avis
   Future<void> ajouterAvis(ReviewModel avis) async {
     await _db.collection('reviews').add(avis.toMap());
-    // recalculer la note moyenne du bien
     final avisSnapshot =
         await _db
             .collection('reviews')
@@ -209,8 +208,13 @@ class FirestoreService {
   Future<String> creerOuRecupererConversation(
     String locataireId,
     String proprietaireId,
-    String bienId,
-  ) async {
+    String bienId, {
+    String titreBien = '',
+    String nomLocataire = '',
+    String nomProprietaire = '',
+    String? photoLocataire,
+    String? photoProprietaire,
+  }) async {
     final snapshot =
         await _db
             .collection('conversations')
@@ -223,13 +227,23 @@ class FirestoreService {
       if (participants.contains(proprietaireId)) return doc.id;
     }
 
-    // créer une nouvelle conversation
+    // créer une nouvelle conversation avec les noms
     final doc = await _db.collection('conversations').add({
       'participants': [locataireId, proprietaireId],
       'bienId': bienId,
       'dernierMessage': '',
       'dateDernierMessage': Timestamp.fromDate(DateTime.now()),
       'messagesNonLus': {locataireId: 0, proprietaireId: 0},
+      'titreBien': titreBien,
+      // noms par participant pour affichage côté locataire et propriétaire
+      'nomParticipant': {
+        locataireId: nomLocataire,
+        proprietaireId: nomProprietaire,
+      },
+      'photoParticipant': {
+        locataireId: photoLocataire ?? '',
+        proprietaireId: photoProprietaire ?? '',
+      },
     });
     return doc.id;
   }
@@ -242,11 +256,38 @@ class FirestoreService {
         .collection('messages')
         .add(message.toMap());
 
-    // mettre à jour la conversation
+    // récupérer les participants pour incrémenter le compteur du destinataire
+    final convDoc = await _db.collection('conversations').doc(convId).get();
+    final participants = List<String>.from(
+      convDoc.data()?['participants'] ?? [],
+    );
+    final destinataireId = participants.firstWhere(
+      (p) => p != message.expediteurId,
+      orElse: () => '',
+    );
+
     await _db.collection('conversations').doc(convId).update({
       'dernierMessage': message.contenu,
       'dateDernierMessage': Timestamp.fromDate(message.dateEnvoi),
-      'messagesNonLus.${message.expediteurId}': FieldValue.increment(0),
+      if (destinataireId.isNotEmpty)
+        'messagesNonLus.$destinataireId': FieldValue.increment(1),
+    });
+  }
+
+  // marquer un message comme lu
+  Future<void> marquerMessageLu(String convId, String messageId) async {
+    await _db
+        .collection('conversations')
+        .doc(convId)
+        .collection('messages')
+        .doc(messageId)
+        .update({'estLu': true});
+  }
+
+  // réinitialiser le compteur de messages non lus pour un utilisateur
+  Future<void> reinitialiserMessagesNonLus(String convId, String uid) async {
+    await _db.collection('conversations').doc(convId).update({
+      'messagesNonLus.$uid': 0,
     });
   }
 

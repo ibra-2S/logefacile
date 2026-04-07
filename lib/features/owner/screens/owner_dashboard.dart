@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/models/message_model.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/models/visit_request_model.dart';
 import '../../../core/services/firestore_service.dart';
@@ -20,15 +21,29 @@ class OwnerDashboard extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.fond,
       appBar: AppBar(
-        backgroundColor: AppColors.bleuFonce,
         elevation: 0,
-        title: const Text(
-          'LogeFacile',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.bleuFonce, AppColors.bleuMoyen],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
           ),
+        ),
+        title: Row(
+          children: [
+            Image.asset('assets/images/icone.png', height: 34, width: 34),
+            const SizedBox(width: 8),
+            const Text(
+              'LogeFacile',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -50,152 +65,165 @@ class OwnerDashboard extends ConsumerWidget {
                   return StreamBuilder<List<VisitRequestModel>>(
                     stream: firestoreService.demandesRecues(utilisateur.uid),
                     builder: (context, snapshotDemandes) {
-                      final biens = snapshotBiens.data ?? [];
-                      final demandes = snapshotDemandes.data ?? [];
-
-                      // calcul des vues totales
-                      final vuesTotales = biens.fold<int>(
-                        0,
-                        (total, b) => total + b.nombreVues,
-                      );
-
-                      // demandes
-                      final demandesTotales = demandes.length;
-                      final demandesNonTraitees =
-                          demandes.where((d) => d.estEnAttente).length;
-
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // carte bonjour
-                            _carteBonjour(
-                              utilisateur.nomComplet.split(' ').first,
-                            ),
-                            const SizedBox(height: 24),
-
-                            // statistiques réelles
-                            const Text(
-                              'Vue d\'ensemble',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.texte,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _carteStatistique(
-                                    '${biens.length}',
-                                    'Biens publiés',
-                                    Icons.home_outlined,
-                                    AppColors.vertProprietaire,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _carteStatistique(
-                                    '$demandesTotales',
-                                    'Demandes reçues',
-                                    Icons.calendar_today_outlined,
-                                    AppColors.bleuMoyen,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _carteStatistique(
-                                    '${biens.where((b) => b.statut == StatutBien.loue).length}',
-                                    'Biens loués',
-                                    Icons.check_circle_outline,
-                                    AppColors.tealLocataire,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _carteStatistique(
-                                    '$vuesTotales',
-                                    'Vues totales',
-                                    Icons.visibility_outlined,
-                                    AppColors.violetAdmin,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _carteStatistique(
-                                    '$demandesNonTraitees',
-                                    'Demandes en attente',
-                                    Icons.hourglass_empty_outlined,
-                                    AppColors.avertissement,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(child: SizedBox()),
-                              ],
-                            ),
-                            const SizedBox(height: 28),
-
-                            // actions rapides
-                            const Text(
-                              'Actions rapides',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.texte,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            _carteAction(
-                              context,
-                              emoji: '➕',
-                              titre: 'Publier un bien',
-                              description:
-                                  'Ajouter un nouveau logement à louer',
-                              couleur: AppColors.vertProprietaire,
-                              onTap: () => context.push(AppRoutes.ajouterBien),
-                            ),
-                            const SizedBox(height: 10),
-                            _carteAction(
-                              context,
-                              emoji: '🏠',
-                              titre: 'Mes biens',
-                              description: 'Gérer vos logements publiés',
-                              couleur: AppColors.bleuMoyen,
-                              onTap: () => context.push(AppRoutes.mesBiens),
-                            ),
-                            const SizedBox(height: 10),
-                            _carteAction(
-                              context,
-                              emoji: '📅',
-                              titre: 'Demandes de visite',
-                              description: 'Voir et gérer les demandes reçues',
-                              couleur: AppColors.tealLocataire,
-                              onTap:
-                                  () => context.push(AppRoutes.demandesVisite),
-                            ),
-                            const SizedBox(height: 10),
-                            _carteAction(
-                              context,
-                              emoji: '💬',
-                              titre: 'Messages',
-                              description:
-                                  'Vos conversations avec les locataires',
-                              couleur: AppColors.violetAdmin,
-                              onTap:
-                                  () => context.push(AppRoutes.conversations),
-                            ),
-                          ],
+                      return StreamBuilder<List<ConversationModel>>(
+                        stream: firestoreService.conversationsUtilisateur(
+                          utilisateur.uid,
                         ),
+                        builder: (context, snapshotConvs) {
+                          final biens = snapshotBiens.data ?? [];
+                          final demandes = snapshotDemandes.data ?? [];
+                          final conversations = snapshotConvs.data ?? [];
+
+                          final vuesTotales = biens.fold<int>(
+                            0,
+                            (total, b) => total + b.nombreVues,
+                          );
+                          final demandesTotales = demandes.length;
+                          final demandesNonTraitees =
+                              demandes.where((d) => d.estEnAttente).length;
+                          final messagesNonLus = conversations.fold<int>(
+                            0,
+                            (total, conv) =>
+                                total +
+                                (conv.messagesNonLus[utilisateur.uid] ?? 0),
+                          );
+
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _carteBonjour(
+                                  utilisateur.nomComplet.split(' ').first,
+                                ),
+                                const SizedBox(height: 24),
+                                const Text(
+                                  'Vue d\'ensemble',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.texte,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _carteStatistique(
+                                        '${biens.length}',
+                                        'Biens publiés',
+                                        Icons.home_outlined,
+                                        AppColors.vertProprietaire,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _carteStatistique(
+                                        '$demandesTotales',
+                                        'Demandes reçues',
+                                        Icons.calendar_today_outlined,
+                                        AppColors.bleuMoyen,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _carteStatistique(
+                                        '${biens.where((b) => b.statut == StatutBien.loue).length}',
+                                        'Biens loués',
+                                        Icons.check_circle_outline,
+                                        AppColors.tealLocataire,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _carteStatistique(
+                                        '$vuesTotales',
+                                        'Vues totales',
+                                        Icons.visibility_outlined,
+                                        AppColors.violetAdmin,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _carteStatistique(
+                                        '$demandesNonTraitees',
+                                        'Demandes en attente',
+                                        Icons.hourglass_empty_outlined,
+                                        AppColors.avertissement,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(child: SizedBox()),
+                                  ],
+                                ),
+                                const SizedBox(height: 28),
+                                const Text(
+                                  'Actions rapides',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.texte,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                _carteAction(
+                                  context,
+                                  emoji: '➕',
+                                  titre: 'Publier un bien',
+                                  description:
+                                      'Ajouter un nouveau logement à louer',
+                                  couleur: AppColors.vertProprietaire,
+                                  onTap:
+                                      () => context.push(AppRoutes.ajouterBien),
+                                ),
+                                const SizedBox(height: 10),
+                                _carteAction(
+                                  context,
+                                  emoji: '🏠',
+                                  titre: 'Mes biens',
+                                  description: 'Gérer vos logements publiés',
+                                  couleur: AppColors.bleuMoyen,
+                                  onTap: () => context.push(AppRoutes.mesBiens),
+                                ),
+                                const SizedBox(height: 10),
+                                _carteAction(
+                                  context,
+                                  emoji: '📅',
+                                  titre: 'Demandes de visite',
+                                  description:
+                                      'Voir et gérer les demandes reçues',
+                                  couleur: AppColors.tealLocataire,
+                                  badge: demandesNonTraitees,
+                                  onTap:
+                                      () => context.push(
+                                        AppRoutes.demandesVisite,
+                                      ),
+                                ),
+                                const SizedBox(height: 10),
+                                _carteAction(
+                                  context,
+                                  emoji: '💬',
+                                  titre: 'Messages',
+                                  description:
+                                      'Vos conversations avec les locataires',
+                                  couleur: AppColors.violetAdmin,
+                                  badge: messagesNonLus,
+                                  onTap:
+                                      () =>
+                                          context.push(AppRoutes.conversations),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       );
                     },
                   );

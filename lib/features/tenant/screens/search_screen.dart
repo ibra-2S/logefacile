@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/models/message_model.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../features/auth/providers/auth_provider.dart';
@@ -50,25 +51,86 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Scaffold(
       backgroundColor: AppColors.fond,
       appBar: AppBar(
-        backgroundColor: AppColors.bleuFonce,
         elevation: 0,
-        title: const Text(
-          'LogeFacile',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.bleuFonce, AppColors.tealLocataire],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
           ),
+        ),
+        title: Row(
+          children: [
+            Image.asset('assets/images/icone.png', height: 34, width: 34),
+            const SizedBox(width: 8),
+            const Text(
+              'LogeFacile',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.favorite_outline, color: Colors.white),
             onPressed: () => context.push(AppRoutes.mesFavoris),
           ),
-          IconButton(
-            icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-            onPressed: () => context.push(AppRoutes.conversations),
-          ),
+          // icône messages avec badge
+          if (utilisateur != null)
+            StreamBuilder<List<ConversationModel>>(
+              stream: _firestoreService.conversationsUtilisateur(
+                utilisateur.uid,
+              ),
+              builder: (context, snapshot) {
+                final conversations = snapshot.data ?? [];
+                final messagesNonLus = conversations.fold<int>(
+                  0,
+                  (total, conv) =>
+                      total + (conv.messagesNonLus[utilisateur.uid] ?? 0),
+                );
+                return Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.chat_bubble_outline,
+                        color: Colors.white,
+                      ),
+                      onPressed: () => context.push(AppRoutes.conversations),
+                    ),
+                    if (messagesNonLus > 0)
+                      Positioned(
+                        right: 6,
+                        top: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.erreur,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$messagesNonLus',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+              onPressed: () => context.push(AppRoutes.conversations),
+            ),
           IconButton(
             icon: const Icon(Icons.person_outline, color: Colors.white),
             onPressed: () => context.push(AppRoutes.profil),
@@ -141,7 +203,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // villes
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -188,8 +249,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-
-                // types
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -265,7 +324,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
           ),
 
-          // liste des biens depuis Firestore
+          // liste des biens
           Expanded(
             child: StreamBuilder<List<PropertyModel>>(
               stream: _firestoreService.rechercherBiens(
@@ -284,7 +343,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
                 var biens = snapshot.data ?? [];
 
-                // filtre texte local
                 if (_rechercheCtrl.text.isNotEmpty) {
                   final q = _rechercheCtrl.text.toLowerCase();
                   biens =
@@ -369,7 +427,6 @@ class _CarteBien extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // image
             Container(
               height: 160,
               decoration: BoxDecoration(
@@ -392,7 +449,6 @@ class _CarteBien extends StatelessWidget {
                       )
                       : null,
             ),
-
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(

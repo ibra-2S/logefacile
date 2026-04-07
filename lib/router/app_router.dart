@@ -17,6 +17,7 @@ import '../features/owner/screens/my_properties_screen.dart';
 import '../features/owner/screens/owner_dashboard.dart';
 import '../features/owner/screens/visit_requests_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
+import '../features/splash/screens/splash_screen.dart';
 import '../features/tenant/screens/alerts_screen.dart';
 import '../features/tenant/screens/favorites_screen.dart';
 import '../features/tenant/screens/my_requests_screen.dart';
@@ -43,6 +44,7 @@ final routeurApp = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: AppRoutes.connexion,
         builder: (context, state) => const LoginScreen(),

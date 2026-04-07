@@ -29,6 +29,9 @@ class AuthService {
         password: motDePasse,
       );
 
+      // envoyer l'email de vérification
+      await resultat.user!.sendEmailVerification();
+
       final nouvelUtilisateur = UserModel(
         uid: resultat.user!.uid,
         email: email,
@@ -44,6 +47,9 @@ class AuthService {
           .collection('users')
           .doc(resultat.user!.uid)
           .set(nouvelUtilisateur.toMap());
+
+      // déconnecter l'utilisateur jusqu'à vérification
+      await _auth.signOut();
 
       return nouvelUtilisateur;
     } catch (e) {
@@ -62,12 +68,36 @@ class AuthService {
         password: motDePasse,
       );
 
+      // vérifier si l'email est confirmé
+      //if (!resultat.user!.emailVerified) {
+      // await _auth.signOut();
+      // throw 'Veuillez confirmer votre email avant de vous connecter. Vérifiez votre boîte mail.';
+      // }
+
       // mise à jour de la dernière connexion
       await _db.collection('users').doc(resultat.user!.uid).update({
         'derniereCo': Timestamp.fromDate(DateTime.now()),
       });
 
       return await recupererUtilisateur(resultat.user!.uid);
+    } catch (e) {
+      if (e is String) rethrow;
+      throw _gererErreur(e);
+    }
+  }
+
+  // renvoyer l'email de vérification
+  Future<void> renvoyerEmailVerification(
+    String email,
+    String motDePasse,
+  ) async {
+    try {
+      final resultat = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: motDePasse,
+      );
+      await resultat.user!.sendEmailVerification();
+      await _auth.signOut();
     } catch (e) {
       throw _gererErreur(e);
     }
@@ -90,11 +120,9 @@ class AuthService {
       final resultat = await _auth.signInWithCredential(credential);
       final uid = resultat.user!.uid;
 
-      // vérifier si l'utilisateur existe déjà dans Firestore
       final docExistant = await _db.collection('users').doc(uid).get();
 
       if (!docExistant.exists) {
-        // premier login Google — créer le profil
         final nouvelUtilisateur = UserModel(
           uid: uid,
           email: resultat.user!.email ?? '',
@@ -107,7 +135,6 @@ class AuthService {
         await _db.collection('users').doc(uid).set(nouvelUtilisateur.toMap());
         return nouvelUtilisateur;
       } else {
-        // utilisateur existant — mise à jour dernière connexion
         await _db.collection('users').doc(uid).update({
           'derniereCo': Timestamp.fromDate(DateTime.now()),
         });
@@ -158,8 +185,12 @@ class AuthService {
           return 'Aucun compte trouvé avec cet email.';
         case 'wrong-password':
           return 'Mot de passe incorrect.';
+        case 'invalid-credential':
+          return 'Email ou mot de passe incorrect.';
         case 'too-many-requests':
           return 'Trop de tentatives. Réessayez plus tard.';
+        case 'network-request-failed':
+          return 'Pas de connexion internet. Vérifiez votre réseau.';
         default:
           return 'Une erreur est survenue. Réessayez.';
       }

@@ -75,5 +75,5 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/images/icone.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/icone.png"
+  adaptive_icon_foreground: "assets/images/logo.png"
   adaptive_icon_display: fullBleed
