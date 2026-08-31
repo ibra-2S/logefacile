@@ -1,16 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/skeleton.dart';
 
-class UsersManagementScreen extends ConsumerWidget {
+class UsersManagementScreen extends ConsumerStatefulWidget {
   const UsersManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UsersManagementScreen> createState() =>
+      _UsersManagementScreenState();
+}
+
+class _UsersManagementScreenState extends ConsumerState<UsersManagementScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final firestoreService = FirestoreService();
 
     return Scaffold(
@@ -22,42 +44,98 @@ class UsersManagementScreen extends ConsumerWidget {
           'Gestion des utilisateurs',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          isScrollable: true,
+          tabs: const [
+            Tab(text: '🔍 Locataires'),
+            Tab(text: '🏠 Propriétaires'),
+            Tab(text: '🤝 Agents'),
+            Tab(text: '👑 Admins'),
+          ],
         ),
       ),
       body: StreamBuilder<List<UserModel>>(
         stream: firestoreService.tousLesUtilisateurs(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const ListTileSkeleton();
           }
 
-          final utilisateurs = snapshot.data ?? [];
+          final tous = snapshot.data ?? [];
+          final locataires =
+              tous.where((u) => u.role == UserRole.locataire).toList();
+          final proprietaires =
+              tous.where((u) => u.role == UserRole.proprietaire).toList();
+          final agents = tous.where((u) => u.role == UserRole.agent).toList();
+          final admins = tous.where((u) => u.role == UserRole.admin).toList();
 
-          if (utilisateurs.isEmpty) {
-            return const Center(
-              child: Text(
-                'Aucun utilisateur trouvé',
-                style: TextStyle(color: AppColors.textSecondaire),
-              ),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: utilisateurs.length,
-            itemBuilder: (context, index) {
-              final user = utilisateurs[index];
-              return _CarteUtilisateur(
-                user: user,
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _ListeUtilisateurs(
+                utilisateurs: locataires,
                 firestoreService: firestoreService,
-              );
-            },
+                messageVide: 'Aucun locataire',
+              ),
+              _ListeUtilisateurs(
+                utilisateurs: proprietaires,
+                firestoreService: firestoreService,
+                messageVide: 'Aucun propriétaire',
+              ),
+              _ListeUtilisateurs(
+                utilisateurs: agents,
+                firestoreService: firestoreService,
+                messageVide: 'Aucun agent',
+              ),
+              _ListeUtilisateurs(
+                utilisateurs: admins,
+                firestoreService: firestoreService,
+                messageVide: 'Aucun admin',
+              ),
+            ],
           );
         },
       ),
+    );
+  }
+}
+
+class _ListeUtilisateurs extends StatelessWidget {
+  final List<UserModel> utilisateurs;
+  final FirestoreService firestoreService;
+  final String messageVide;
+
+  const _ListeUtilisateurs({
+    required this.utilisateurs,
+    required this.firestoreService,
+    required this.messageVide,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (utilisateurs.isEmpty) {
+      return EmptyState(
+        icone: Icons.group_outlined,
+        titre: messageVide,
+        message: 'Aucun compte de ce type pour l\'instant.',
+        couleur: AppColors.violetAdmin,
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: utilisateurs.length,
+      itemBuilder: (context, index) {
+        final user = utilisateurs[index];
+        return _CarteUtilisateur(
+          user: user,
+          firestoreService: firestoreService,
+        );
+      },
     );
   }
 }
@@ -76,6 +154,10 @@ class _CarteUtilisateur extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
+        border:
+            user.estActif
+                ? null
+                : Border.all(color: AppColors.erreur.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -110,13 +192,38 @@ class _CarteUtilisateur extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  user.nomComplet,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.texte,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        user.nomComplet,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.texte,
+                        ),
+                      ),
+                    ),
+                    if (!user.estActif)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.erreur.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'Suspendu',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.erreur,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 Text(
                   user.email,
@@ -125,8 +232,16 @@ class _CarteUtilisateur extends StatelessWidget {
                     color: AppColors.textSecondaire,
                   ),
                 ),
-                const SizedBox(height: 4),
-                _badgeRole(user.role),
+                if (user.telephone != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    user.telephone!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.texteLeger,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -146,7 +261,33 @@ class _CarteUtilisateur extends StatelessWidget {
                   true,
                 );
               } else if (valeur == 'supprimer') {
-                await firestoreService.supprimerUtilisateur(user.uid);
+                final confirme = await showDialog<bool>(
+                  context: context,
+                  builder:
+                      (ctx) => AlertDialog(
+                        title: const Text('Supprimer cet utilisateur ?'),
+                        content: const Text('Cette action est irréversible.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Annuler'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.erreur,
+                            ),
+                            child: const Text(
+                              'Supprimer',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                );
+                if (confirme == true) {
+                  await firestoreService.supprimerUtilisateur(user.uid);
+                }
               }
             },
             itemBuilder:
@@ -203,33 +344,9 @@ class _CarteUtilisateur extends StatelessWidget {
       case UserRole.agent:
         return AppColors.bleuFonce;
       case UserRole.locataire:
-        return AppColors.avertissement;
+        return AppColors.tealLocataire;
       case UserRole.admin:
-        return AppColors.erreur;
+        return AppColors.violetAdmin;
     }
-  }
-
-  Widget _badgeRole(UserRole role) {
-    final labels = {
-      UserRole.proprietaire: 'Propriétaire',
-      UserRole.agent: 'Agent',
-      UserRole.locataire: 'Locataire',
-      UserRole.admin: 'Admin',
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: _couleurRole(role).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        labels[role]!,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: _couleurRole(role),
-        ),
-      ),
-    );
   }
 }

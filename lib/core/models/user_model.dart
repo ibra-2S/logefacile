@@ -46,9 +46,18 @@ class UserModel {
     this.totalFavoris = 0,
   });
 
+  // convertit une valeur Firestore en DateTime sans planter si le champ
+  // est absent ou d'un type inattendu (anciens comptes)
+  static DateTime _lireDate(dynamic valeur) {
+    if (valeur is Timestamp) return valeur.toDate();
+    if (valeur is DateTime) return valeur;
+    if (valeur is String) return DateTime.tryParse(valeur) ?? DateTime.now();
+    return DateTime.now();
+  }
+
   // construction depuis un document Firestore
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
+    final d = (doc.data() as Map<String, dynamic>?) ?? {};
     return UserModel(
       uid: doc.id,
       email: d['email'] ?? '',
@@ -61,8 +70,8 @@ class UserModel {
       telephone: d['telephone'],
       estVerifie: d['estVerifie'] ?? false,
       estActif: d['estActif'] ?? true,
-      dateCreation: (d['dateCreation'] as Timestamp).toDate(),
-      derniereCo: (d['derniereCo'] as Timestamp).toDate(),
+      dateCreation: _lireDate(d['dateCreation']),
+      derniereCo: _lireDate(d['derniereCo'] ?? d['dateCreation']),
       nomAgence: d['nomAgence'],
       biographie: d['biographie'],
       totalBiens: d['totalBiens'] ?? 0,

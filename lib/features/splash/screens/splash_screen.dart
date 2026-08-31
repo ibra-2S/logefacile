@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/models/user_model.dart';
+import '../../../core/services/prefs_service.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -13,122 +15,64 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _dejaRedirige = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
+  void _rediriger(UserModel? utilisateur) {
+    if (!mounted || _dejaRedirige) return;
+    _dejaRedirige = true;
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
-
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
-
-    _controller.forward();
-
-    // attendre 2.5 secondes puis rediriger
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (!mounted) return;
-      _rediriger();
-    });
-  }
-
-  void _rediriger() {
-    final authState = ref.read(authStateProvider);
-    final user = authState.asData?.value;
-
-    if (user == null) {
+    if (utilisateur == null) {
       context.go(AppRoutes.connexion);
       return;
     }
 
-    // récupérer le rôle et rediriger
-    ref.read(utilisateurActuelProvider.future).then((utilisateur) {
-      if (!mounted) return;
-      if (utilisateur == null) {
-        context.go(AppRoutes.connexion);
-        return;
-      }
-      switch (utilisateur.role) {
-        case UserRole.proprietaire:
-        case UserRole.agent:
-          context.go(AppRoutes.tableauBordProprietaire);
-          break;
-        case UserRole.locataire:
-          context.go(AppRoutes.rechercheLocataire);
-          break;
-        case UserRole.admin:
-          context.go(AppRoutes.tableauBordAdmin);
-          break;
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+    switch (utilisateur.role) {
+      case UserRole.proprietaire:
+      case UserRole.agent:
+        context.go(AppRoutes.tableauBordProprietaire);
+      case UserRole.locataire:
+        context.go(AppRoutes.rechercheLocataire);
+      case UserRole.admin:
+        context.go(AppRoutes.tableauBordAdmin);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1A237E), Color(0xFF1565C0)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // logo
-                      Image.asset(
-                        'assets/images/logo.png',
-                        height: 180,
-                        fit: BoxFit.contain,
-                      ),
-                      const SizedBox(height: 24),
-                      // indicateur de chargement
-                      const SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: CircularProgressIndicator(
-                          color: Colors.white54,
-                          strokeWidth: 2.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
+    final authState = ref.watch(authStateProvider);
+
+    authState.when(
+      data: (firebaseUser) {
+        if (firebaseUser == null) {
+          Future.microtask(() async {
+            final vu = await PrefsService.onboardingVu();
+            if (!mounted || _dejaRedirige) return;
+            _dejaRedirige = true;
+            context.go(vu ? AppRoutes.connexion : AppRoutes.onboarding);
+          });
+        } else {
+          Future.microtask(() async {
+            if (!mounted || _dejaRedirige) return;
+            final utilisateur = await ref.read(
+              utilisateurActuelProvider.future,
+            );
+            _rediriger(utilisateur);
+          });
+        }
+      },
+      loading: () {},
+      error: (_, __) {
+        Future.microtask(() {
+          if (mounted && !_dejaRedirige) {
+            _dejaRedirige = true;
+            context.go(AppRoutes.connexion);
+          }
+        });
+      },
     );
+
+    // squelette pendant que Firebase récupère la session et le profil
+    return const ScreenSkeleton();
   }
 }

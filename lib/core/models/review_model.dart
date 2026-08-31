@@ -21,8 +21,15 @@ class ReviewModel {
     required this.dateCreation,
   });
 
+  static DateTime _lireDate(dynamic valeur) {
+    if (valeur is Timestamp) return valeur.toDate();
+    if (valeur is DateTime) return valeur;
+    if (valeur is String) return DateTime.tryParse(valeur) ?? DateTime.now();
+    return DateTime.now();
+  }
+
   factory ReviewModel.fromFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
+    final d = (doc.data() as Map<String, dynamic>?) ?? {};
     return ReviewModel(
       id: doc.id,
       bienId: d['bienId'] ?? '',
@@ -31,7 +38,7 @@ class ReviewModel {
       note: (d['note'] ?? 0).toDouble(),
       commentaire: d['commentaire'],
       demandeVisiteId: d['demandeVisiteId'] ?? '',
-      dateCreation: (d['dateCreation'] as Timestamp).toDate(),
+      dateCreation: _lireDate(d['dateCreation']),
     );
   }
 

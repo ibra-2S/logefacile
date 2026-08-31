@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/models/message_model.dart';
@@ -82,10 +81,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         title: const Text(
           'Conversation',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
         ),
       ),
       body: Column(

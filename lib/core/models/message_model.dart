@@ -3,6 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // types de messages possibles
 enum TypeMessage { texte, image }
 
+// convertit une valeur Firestore en DateTime sans planter si le champ
+// est absent ou d'un type inattendu
+DateTime _lireDate(dynamic valeur) {
+  if (valeur is Timestamp) return valeur.toDate();
+  if (valeur is DateTime) return valeur;
+  if (valeur is String) return DateTime.tryParse(valeur) ?? DateTime.now();
+  return DateTime.now();
+}
+
 class MessageModel {
   final String id;
   final String expediteurId;
@@ -21,7 +30,7 @@ class MessageModel {
   });
 
   factory MessageModel.fromFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
+    final d = (doc.data() as Map<String, dynamic>?) ?? {};
     return MessageModel(
       id: doc.id,
       expediteurId: d['expediteurId'] ?? '',
@@ -31,7 +40,7 @@ class MessageModel {
         orElse: () => TypeMessage.texte,
       ),
       estLu: d['estLu'] ?? false,
-      dateEnvoi: (d['dateEnvoi'] as Timestamp).toDate(),
+      dateEnvoi: _lireDate(d['dateEnvoi']),
     );
   }
 
@@ -91,13 +100,13 @@ class ConversationModel {
   }
 
   factory ConversationModel.fromFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
+    final d = (doc.data() as Map<String, dynamic>?) ?? {};
     return ConversationModel(
       id: doc.id,
       participants: List<String>.from(d['participants'] ?? []),
       bienId: d['bienId'] ?? '',
       dernierMessage: d['dernierMessage'] ?? '',
-      dateDernierMessage: (d['dateDernierMessage'] as Timestamp).toDate(),
+      dateDernierMessage: _lireDate(d['dateDernierMessage']),
       messagesNonLus: Map<String, int>.from(d['messagesNonLus'] ?? {}),
       titreBien: d['titreBien'] ?? '',
       nomParticipant: Map<String, String>.from(d['nomParticipant'] ?? {}),

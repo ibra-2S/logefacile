@@ -6,6 +6,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/models/message_model.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class ConversationsScreen extends ConsumerWidget {
@@ -35,37 +37,44 @@ class ConversationsScreen extends ConsumerWidget {
                 ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const ListTileSkeleton();
                   }
 
                   final conversations = snapshot.data ?? [];
 
                   if (conversations.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('💬', style: TextStyle(fontSize: 64)),
-                          SizedBox(height: 16),
-                          Text(
-                            'Aucune conversation',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.texte,
-                            ),
+                    return RefreshIndicator(
+                      onRefresh:
+                          () => Future<void>.delayed(
+                            const Duration(milliseconds: 600),
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Vos échanges apparaîtront ici',
-                            style: TextStyle(color: AppColors.textSecondaire),
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            child: const EmptyState(
+                              icone: Icons.forum_outlined,
+                              titre: 'Aucune conversation',
+                              message:
+                                  'Contactez un propriétaire depuis une '
+                                  'annonce pour démarrer une discussion. '
+                                  'Elle apparaîtra ici.',
+                              couleur: AppColors.tealLocataire,
+                            ),
                           ),
                         ],
                       ),
                     );
                   }
 
-                  return ListView.builder(
+                  return RefreshIndicator(
+                    onRefresh:
+                        () => Future<void>.delayed(
+                          const Duration(milliseconds: 600),
+                        ),
+                    child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: conversations.length,
                     itemBuilder: (context, index) {
                       final conv = conversations[index];
@@ -198,6 +207,7 @@ class ConversationsScreen extends ConsumerWidget {
                             ),
                       );
                     },
+                    ),
                   );
                 },
               ),

@@ -1,15 +1,24 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/skeleton.dart';
 
-class ReportsScreen extends ConsumerWidget {
+class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReportsScreen> createState() => _ReportsScreenState();
+}
+
+class _ReportsScreenState extends ConsumerState<ReportsScreen> {
+  bool _afficherTraites = false;
+
+  @override
+  Widget build(BuildContext context) {
     final firestoreService = FirestoreService();
 
     return Scaffold(
@@ -21,42 +30,50 @@ class ReportsScreen extends ConsumerWidget {
           'Signalements',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
+        actions: [
+          // toggle afficher traités
+          Row(
+            children: [
+              const Text(
+                'Traités',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              Switch(
+                value: _afficherTraites,
+                onChanged: (val) => setState(() => _afficherTraites = val),
+                activeColor: Colors.white,
+                activeTrackColor: Colors.white30,
+                inactiveThumbColor: Colors.white54,
+                inactiveTrackColor: Colors.white24,
+              ),
+            ],
+          ),
+        ],
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: firestoreService.tousLesSignalements(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const ListTileSkeleton();
           }
 
-          final signalements = snapshot.data ?? [];
+          var signalements = snapshot.data ?? [];
+
+          // filtrer selon le toggle
+          if (!_afficherTraites) {
+            signalements =
+                signalements.where((s) => s['traite'] != true).toList();
+          }
 
           if (signalements.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('🚨', style: TextStyle(fontSize: 64)),
-                  SizedBox(height: 16),
-                  Text(
-                    'Aucun signalement',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.texte,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Tout est tranquille !',
-                    style: TextStyle(color: AppColors.textSecondaire),
-                  ),
-                ],
-              ),
+            return EmptyState(
+              icone: Icons.verified_user_outlined,
+              titre:
+                  _afficherTraites
+                      ? 'Aucun signalement'
+                      : 'Aucun signalement en attente',
+              message: 'Tout est tranquille, rien à modérer pour le moment.',
+              couleur: AppColors.succes,
             );
           }
 
@@ -86,6 +103,18 @@ class _CarteSignalement extends StatelessWidget {
     required this.firestoreService,
   });
 
+  String _formaterDate(dynamic date) {
+    if (date == null) return 'Date inconnue';
+    if (date is Timestamp) {
+      final d = date.toDate();
+      return '${d.day.toString().padLeft(2, '0')}/'
+          '${d.month.toString().padLeft(2, '0')}/'
+          '${d.year} à ${d.hour.toString().padLeft(2, '0')}h'
+          '${d.minute.toString().padLeft(2, '0')}';
+    }
+    return date.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final estTraite = signalement['traite'] == true;
@@ -113,6 +142,7 @@ class _CarteSignalement extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // en-tête
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -155,37 +185,113 @@ class _CarteSignalement extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          if (signalement['description'] != null) ...[
-            Text(
-              signalement['description'],
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondaire,
+          // description
+          if (signalement['description'] != null &&
+              signalement['description'].toString().isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.fond,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                signalement['description'],
+                style: const TextStyle(fontSize: 13, color: AppColors.texte),
               ),
             ),
             const SizedBox(height: 10),
           ],
 
-          if (!estTraite)
+          // infos supplémentaires
+          if (signalement['bienId'] != null) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.home_outlined,
+                  size: 14,
+                  color: AppColors.textSecondaire,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Bien : ${signalement['bienId'].toString().substring(0, 8)}...',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaire,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+
+          if (signalement['signalePar'] != null) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.person_outline,
+                  size: 14,
+                  color: AppColors.textSecondaire,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Signalé par : ${signalement['signalePar'].toString().substring(0, 8)}...',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaire,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+
+          Row(
+            children: [
+              const Icon(
+                Icons.access_time_outlined,
+                size: 14,
+                color: AppColors.texteLeger,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _formaterDate(signalement['dateCreation']),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.texteLeger,
+                ),
+              ),
+            ],
+          ),
+
+          // bouton marquer traité
+          if (!estTraite) ...[
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed:
                     () => firestoreService.marquerSignalementTraite(
                       signalement['id'],
                     ),
+                icon: const Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                label: const Text(
+                  'Marquer comme traité',
+                  style: TextStyle(color: Colors.white),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.bleuFonce,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  'Marquer comme traité',
-                  style: TextStyle(color: Colors.white),
-                ),
               ),
             ),
+          ],
         ],
       ),
     );

@@ -24,6 +24,17 @@ class AppRoutes {
   // commun
   static const chat = '/conversations/:id';
 
+  // onboarding et notifications
+  static const onboarding = '/onboarding';
+  static const notifications = '/notifications';
+
+  // profil - paramètres et support
+  static const parametres = '/parametres';
+  static const centreAide = '/centre-aide';
+  static const contact = '/contact';
+  static const confidentialite = '/confidentialite';
+  static const conditions = '/conditions';
+
   // admin
   static const tableauBordAdmin = '/admin';
   static const gestionUtilisateurs = '/admin/utilisateurs';

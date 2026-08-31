@@ -6,6 +6,8 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/models/user_model.dart';
 import '../providers/auth_provider.dart';
 
+const _bleuFonce = Color(0xFF1A237E);
+
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
@@ -19,10 +21,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _telCtrl = TextEditingController();
   final _mdpCtrl = TextEditingController();
   final _confirmMdpCtrl = TextEditingController();
+
   bool _mdpVisible = false;
   bool _chargement = false;
   String? _erreur;
+  int _etape = 0;
   late UserRole _role;
+
+  static const _titresEtapes = ['Identité', 'Connexion', 'Confirmation'];
 
   @override
   void didChangeDependencies() {
@@ -41,28 +47,50 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
+  String? _validerEtape(int etape) {
+    if (etape == 0) {
+      if (_nomCtrl.text.trim().isEmpty) return 'Indiquez votre nom complet.';
+    }
+    if (etape == 1) {
+      final email = _emailCtrl.text.trim();
+      if (email.isEmpty) return 'Indiquez votre adresse e-mail.';
+      if (!email.contains('@') || !email.contains('.')) {
+        return 'Adresse e-mail invalide.';
+      }
+      if (_mdpCtrl.text.length < 6) {
+        return 'Le mot de passe doit contenir au moins 6 caractères.';
+      }
+      if (_mdpCtrl.text != _confirmMdpCtrl.text) {
+        return 'Les mots de passe ne correspondent pas.';
+      }
+    }
+    return null;
+  }
+
+  void _suivant() {
+    final erreur = _validerEtape(_etape);
+    if (erreur != null) {
+      setState(() => _erreur = erreur);
+      return;
+    }
+    setState(() {
+      _erreur = null;
+      _etape++;
+    });
+  }
+
+  void _precedent() {
+    if (_etape == 0) {
+      context.pop();
+      return;
+    }
+    setState(() {
+      _erreur = null;
+      _etape--;
+    });
+  }
+
   Future<void> _sInscrire() async {
-    if (_nomCtrl.text.trim().isEmpty ||
-        _emailCtrl.text.trim().isEmpty ||
-        _mdpCtrl.text.trim().isEmpty) {
-      setState(
-        () => _erreur = 'Veuillez remplir tous les champs obligatoires.',
-      );
-      return;
-    }
-
-    if (_mdpCtrl.text != _confirmMdpCtrl.text) {
-      setState(() => _erreur = 'Les mots de passe ne correspondent pas.');
-      return;
-    }
-
-    if (_mdpCtrl.text.length < 6) {
-      setState(
-        () => _erreur = 'Le mot de passe doit contenir au moins 6 caractères.',
-      );
-      return;
-    }
-
     setState(() {
       _chargement = true;
       _erreur = null;
@@ -82,7 +110,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
       if (!mounted) return;
 
-      // afficher le dialogue de succès
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -107,7 +134,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Un email de confirmation a été envoyé à ${_emailCtrl.text.trim()}.\n\nVeuillez confirmer votre email avant de vous connecter.',
+                    'Un email de confirmation a été envoyé à ${_emailCtrl.text.trim()}.\n\n⚠️ Vous devez cliquer sur le lien dans cet email AVANT de pouvoir vous connecter.\n\nVérifiez aussi vos spams !',
                     style: const TextStyle(fontSize: 14, color: Colors.black54),
                     textAlign: TextAlign.center,
                   ),
@@ -120,14 +147,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         context.go(AppRoutes.connexion);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A237E),
+                        backgroundColor: _bleuFonce,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: const Text(
-                        'Aller à la connexion',
+                        'OK',
                         style: TextStyle(color: Colors.white),
                       ),
                     ),
@@ -158,14 +185,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final dernier = _etape == 2;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1A237E),
+      backgroundColor: _bleuFonce,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
+          onPressed: _precedent,
         ),
       ),
       body: SafeArea(
@@ -174,24 +203,43 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               Text(
                 _titreRole(),
                 style: const TextStyle(
-                  fontSize: 24,
+                  fontSize: 22,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'Créez votre compte gratuitement',
-                style: TextStyle(color: Colors.white60, fontSize: 14),
+              const SizedBox(height: 4),
+              Text(
+                'Étape ${_etape + 1} sur 3 · ${_titresEtapes[_etape]}',
+                style: const TextStyle(color: Colors.white60, fontSize: 13),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 16),
 
-              // formulaire
+              // barre de progression
+              Row(
+                children: List.generate(3, (i) {
+                  return Expanded(
+                    child: Container(
+                      margin: EdgeInsets.only(right: i == 2 ? 0 : 6),
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color:
+                            i <= _etape ? Colors.white : Colors.white24,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 20),
+
+              // carte du formulaire
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -200,64 +248,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _champTexte('Nom complet *', 'Votre nom complet', _nomCtrl),
-                    const SizedBox(height: 14),
-                    _champTexte(
-                      'Email *',
-                      'Votre adresse email',
-                      _emailCtrl,
-                      type: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 14),
-                    _champTexte(
-                      'Téléphone',
-                      'Votre numéro (optionnel)',
-                      _telCtrl,
-                      type: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 14),
-
-                    const Text(
-                      'Mot de passe *',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _mdpCtrl,
-                      obscureText: !_mdpVisible,
-                      decoration: _styleChamp('6 caractères minimum').copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _mdpVisible
-                                ? Icons.visibility_off
-                                : Icons.visibility,
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0.15, 0),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
                           ),
-                          onPressed:
-                              () => setState(() => _mdpVisible = !_mdpVisible),
-                        ),
+                        );
+                      },
+                      child: KeyedSubtree(
+                        key: ValueKey(_etape),
+                        child: _contenuEtape(),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    const Text(
-                      'Confirmer le mot de passe *',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _confirmMdpCtrl,
-                      obscureText: true,
-                      decoration: _styleChamp('Répétez votre mot de passe'),
                     ),
 
                     if (_erreur != null) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
@@ -278,38 +290,68 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ],
 
                     const SizedBox(height: 20),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _chargement ? null : _sInscrire,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1A237E),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _chargement ? null : _precedent,
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: _bleuFonce),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              _etape == 0 ? 'Annuler' : 'Retour',
+                              style: const TextStyle(color: _bleuFonce),
+                            ),
                           ),
                         ),
-                        child:
-                            _chargement
-                                ? const CircularProgressIndicator(
-                                  color: Colors.white,
-                                )
-                                : const Text(
-                                  "S'inscrire",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed:
+                                _chargement
+                                    ? null
+                                    : (dernier ? _sInscrire : _suivant),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _bleuFonce,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child:
+                                _chargement
+                                    ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : Text(
+                                      dernier
+                                          ? 'Créer mon compte'
+                                          : 'Suivant',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -337,7 +379,152 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  Widget _champTexte(
+  Widget _contenuEtape() {
+    switch (_etape) {
+      case 0:
+        return Column(
+          key: const ValueKey('etape0'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Faisons connaissance',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Comment devons-nous vous appeler ?',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+            const SizedBox(height: 18),
+            _champ('Nom complet *', 'Votre nom et prénom', _nomCtrl),
+            const SizedBox(height: 14),
+            _champ(
+              'Téléphone',
+              'Numéro (optionnel)',
+              _telCtrl,
+              type: TextInputType.phone,
+            ),
+          ],
+        );
+      case 1:
+        return Column(
+          key: const ValueKey('etape1'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Vos identifiants',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Ils serviront à vous connecter.',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+            const SizedBox(height: 18),
+            _champ(
+              'Email *',
+              'exemple@email.com',
+              _emailCtrl,
+              type: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Mot de passe *',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _mdpCtrl,
+              obscureText: !_mdpVisible,
+              decoration: _deco('6 caractères minimum').copyWith(
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _mdpVisible ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed:
+                      () => setState(() => _mdpVisible = !_mdpVisible),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Confirmer le mot de passe *',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _confirmMdpCtrl,
+              obscureText: !_mdpVisible,
+              decoration: _deco('Répétez le mot de passe'),
+            ),
+          ],
+        );
+      default:
+        return Column(
+          key: const ValueKey('etape2'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Vérifiez vos informations',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 14),
+            _recap('Profil', _titreRole()),
+            _recap('Nom', _nomCtrl.text.trim()),
+            _recap('Email', _emailCtrl.text.trim()),
+            _recap(
+              'Téléphone',
+              _telCtrl.text.trim().isEmpty
+                  ? 'Non renseigné'
+                  : _telCtrl.text.trim(),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _bleuFonce.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Un e-mail de confirmation vous sera envoyé. Cliquez sur le '
+                'lien avant de vous connecter.',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            ),
+          ],
+        );
+    }
+  }
+
+  Widget _recap(String label, String valeur) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: Colors.black45),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              valeur,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _champ(
     String label,
     String hint,
     TextEditingController ctrl, {
@@ -354,13 +541,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         TextField(
           controller: ctrl,
           keyboardType: type,
-          decoration: _styleChamp(hint),
+          decoration: _deco(hint),
         ),
       ],
     );
   }
 
-  InputDecoration _styleChamp(String hint) {
+  InputDecoration _deco(String hint) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.black38, fontSize: 13),

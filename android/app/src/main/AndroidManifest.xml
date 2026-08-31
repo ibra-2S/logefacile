@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="logefacile"
         android:name="${applicationName}"
@@ -6,9 +10,11 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyASogM6c5MgxLVPHJeV8sja4W7_uGKIOQk"/>
-        <meta-data
-            android:name="com.google.android.maps.v2.renderer"
-            android:value="LATEST"/>
+        <!-- L'ancien moteur de rendu de Google Maps a besoin de l'API Apache
+             HTTP au runtime, sinon crash NoClassDefFoundError org.apache.http -->
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -46,6 +52,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- url_launcher : ouvrir un lien web (agenda Google) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>

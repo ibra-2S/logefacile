@@ -40,22 +40,29 @@ class VisitRequestModel {
     this.etaitAcceptee = false,
   });
 
+  static DateTime _lireDate(dynamic valeur) {
+    if (valeur is Timestamp) return valeur.toDate();
+    if (valeur is DateTime) return valeur;
+    if (valeur is String) return DateTime.tryParse(valeur) ?? DateTime.now();
+    return DateTime.now();
+  }
+
   factory VisitRequestModel.fromFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
+    final d = (doc.data() as Map<String, dynamic>?) ?? {};
     return VisitRequestModel(
       id: doc.id,
       bienId: d['bienId'] ?? '',
       locataireId: d['locataireId'] ?? '',
       proprietaireId: d['proprietaireId'] ?? '',
-      dateProposee: (d['dateProposee'] as Timestamp).toDate(),
+      dateProposee: _lireDate(d['dateProposee']),
       statut: StatutDemande.values.firstWhere(
             (s) => s.name == d['statut'],
         orElse: () => StatutDemande.enAttente,
       ),
       message: d['message'],
       raisonRefus: d['raisonRefus'],
-      dateCreation: (d['dateCreation'] as Timestamp).toDate(),
-      dateMiseAJour: (d['dateMiseAJour'] as Timestamp).toDate(),
+      dateCreation: _lireDate(d['dateCreation']),
+      dateMiseAJour: _lireDate(d['dateMiseAJour'] ?? d['dateCreation']),
       nomLocataire: d['nomLocataire'] ?? '',
       titreBien: d['titreBien'] ?? '',
       nomProprietaire: d['nomProprietaire'] ?? '',

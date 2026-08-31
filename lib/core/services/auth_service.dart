@@ -69,10 +69,10 @@ class AuthService {
       );
 
       // vérifier si l'email est confirmé
-      //if (!resultat.user!.emailVerified) {
-      // await _auth.signOut();
-      // throw 'Veuillez confirmer votre email avant de vous connecter. Vérifiez votre boîte mail.';
-      // }
+      if (!resultat.user!.emailVerified) {
+        await _auth.signOut();
+        throw 'Veuillez confirmer votre email avant de vous connecter. Vérifiez votre boîte mail.';
+      }
 
       // mise à jour de la dernière connexion
       await _db.collection('users').doc(resultat.user!.uid).update({

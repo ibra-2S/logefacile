@@ -6,6 +6,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class FavoritesScreen extends ConsumerWidget {
@@ -25,10 +27,6 @@ class FavoritesScreen extends ConsumerWidget {
           'Mes favoris',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
       ),
       body:
           utilisateur == null
@@ -37,53 +35,62 @@ class FavoritesScreen extends ConsumerWidget {
                 stream: firestoreService.favorisLocataire(utilisateur.uid),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const ListTileSkeleton();
                   }
 
                   final bienIds = snapshot.data ?? [];
 
                   if (bienIds.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('❤️', style: TextStyle(fontSize: 64)),
-                          SizedBox(height: 16),
-                          Text(
-                            'Aucun favori',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.texte,
-                            ),
+                    return RefreshIndicator(
+                      onRefresh:
+                          () => Future<void>.delayed(
+                            const Duration(milliseconds: 600),
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Ajoutez des biens à vos favoris',
-                            style: TextStyle(color: AppColors.textSecondaire),
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            child: const EmptyState(
+                              icone: Icons.favorite_border,
+                              titre: 'Aucun favori',
+                              message:
+                                  'Appuyez sur le cœur d\'une annonce pour la '
+                                  'retrouver ici et la comparer plus tard.',
+                              couleur: AppColors.erreur,
+                            ),
                           ),
                         ],
                       ),
                     );
                   }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: bienIds.length,
-                    itemBuilder: (context, index) {
-                      return StreamBuilder<PropertyModel?>(
-                        stream: firestoreService.getBienParId(bienIds[index]),
-                        builder: (context, bienSnapshot) {
-                          final bien = bienSnapshot.data;
-                          if (bien == null) return const SizedBox.shrink();
-                          return _CarteFavori(
-                            bien: bien,
-                            locataireId: utilisateur.uid,
-                            firestoreService: firestoreService,
-                          );
-                        },
-                      );
-                    },
+                  return RefreshIndicator(
+                    onRefresh:
+                        () => Future<void>.delayed(
+                          const Duration(milliseconds: 600),
+                        ),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: bienIds.length,
+                      itemBuilder: (context, index) {
+                        return StreamBuilder<PropertyModel?>(
+                          stream: firestoreService.getBienParId(
+                            bienIds[index],
+                          ),
+                          builder: (context, bienSnapshot) {
+                            final bien = bienSnapshot.data;
+                            if (bien == null) return const SizedBox.shrink();
+                            return _CarteFavori(
+                              bien: bien,
+                              locataireId: utilisateur.uid,
+                              firestoreService: firestoreService,
+                            );
+                          },
+                        );
+                      },
+                    ),
                   );
                 },
               ),

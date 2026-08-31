@@ -1,0 +1,85 @@
+rules_version = '2';
+
+// Exemple de règles à adapter/fusionner dans la console Firebase.
+// (à copier dans Firestore Database → Règles)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function connecte() { return request.auth != null; }
+    function estMoi(uid) { return request.auth.uid == uid; }
+
+    // Utilisateurs : chacun lit/écrit son propre document.
+    // (les champs notificationsActives, fcmTokens, photoUrl… passent par là)
+    match /users/{uid} {
+      allow read: if connecte();
+      allow create, update: if estMoi(uid);
+      allow delete: if estMoi(uid);
+    }
+
+    // Biens : lecture publique aux connectés, écriture par le propriétaire.
+    // incrementerVues (vues + statsVues) est fait par le visiteur -> on
+    // autorise l'update quand seuls ces compteurs changent.
+    match /properties/{id} {
+      allow read: if connecte();
+      allow create: if connecte()
+        && request.resource.data.proprietaireId == request.auth.uid;
+      allow update: if connecte() && (
+        resource.data.proprietaireId == request.auth.uid
+        || request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['nombreVues', 'statsVues', 'nombreFavoris',
+                       'noteMoyenne', 'nombreAvis'])
+      );
+      allow delete: if connecte()
+        && resource.data.proprietaireId == request.auth.uid;
+    }
+
+    // Favoris
+    match /favorites/{id} {
+      allow read, write: if connecte();
+    }
+
+    // Demandes de visite
+    match /visitRequests/{id} {
+      allow read: if connecte();
+      allow create: if connecte();
+      allow update, delete: if connecte();
+    }
+
+    // Conversations et messages
+    match /conversations/{id} {
+      allow read, create, update: if connecte();
+      match /messages/{mid} {
+        allow read, create, update: if connecte();
+      }
+    }
+
+    // Alertes de recherche
+    match /searchAlerts/{id} {
+      allow read, write: if connecte();
+    }
+
+    // Notifications in-app : n'importe quel utilisateur connecté peut créer
+    // une notification pour un autre ; seul le destinataire la lit/modifie.
+    match /notifications/{id} {
+      allow create: if connecte();
+      allow read, update, delete: if connecte()
+        && resource.data.destinataireId == request.auth.uid;
+    }
+
+    // Signalements (reports) et messages de support
+    match /reports/{id} {
+      allow create: if connecte();
+      allow read, update: if connecte();
+    }
+    match /support_messages/{id} {
+      allow create: if connecte();
+      allow read: if connecte();
+    }
+
+    // Avis
+    match /reviews/{id} {
+      allow read: if connecte();
+      allow create, update: if connecte();
+    }
+  }
+}

@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../constants/app_routes.dart';
 import '../models/message_model.dart';
+import '../models/notification_model.dart';
 import '../models/property_model.dart';
 import '../models/review_model.dart';
 import '../models/user_model.dart';
@@ -44,6 +46,14 @@ class FirestoreService {
         .map((s) => s.docs.map(PropertyModel.fromFirestore).toList());
   }
 
+  Stream<List<PropertyModel>> tousLesBiens() {
+    return _db
+        .collection('properties')
+        .orderBy('datePublication', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(PropertyModel.fromFirestore).toList());
+  }
+
   // rechercher des biens avec filtres
   Stream<List<PropertyModel>> rechercherBiens({
     String? ville,
@@ -74,12 +84,18 @@ class FirestoreService {
         .map((s) => s.docs.map(PropertyModel.fromFirestore).toList());
   }
 
-  // incrémenter le nombre de vues d'un bien
+  // incrémenter le nombre de vues d'un bien (+ compteur journalier pour les stats)
   Future<void> incrementerVues(String bienId) async {
+    final jour = _cleJour(DateTime.now());
     await _db.collection('properties').doc(bienId).update({
       'nombreVues': FieldValue.increment(1),
+      'statsVues.$jour': FieldValue.increment(1),
     });
   }
+
+  // 'yyyy-MM-dd' pour les buckets de statistiques
+  static String _cleJour(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   //FAVORIS
 
@@ -144,6 +160,45 @@ class FirestoreService {
     };
     if (raisonRefus != null) donnees['raisonRefus'] = raisonRefus;
     await _db.collection('visitRequests').doc(demandeId).update(donnees);
+
+    // notifier la partie concernée du changement de statut
+    final doc = await _db.collection('visitRequests').doc(demandeId).get();
+    final d = doc.data();
+    if (d == null) return;
+    final locataireId = d['locataireId'] as String? ?? '';
+    final proprietaireId = d['proprietaireId'] as String? ?? '';
+    final titreBien = d['titreBien'] as String? ?? 'le bien';
+    final nomLocataire = d['nomLocataire'] as String? ?? 'Le locataire';
+
+    switch (statut) {
+      case StatutDemande.acceptee:
+        await creerNotification(
+          destinataireId: locataireId,
+          type: TypeNotification.demandeAcceptee,
+          titre: 'Demande acceptée ✅',
+          corps: 'Votre visite pour "$titreBien" a été acceptée.',
+          lien: AppRoutes.mesDemandesVisite,
+        );
+      case StatutDemande.refusee:
+        await creerNotification(
+          destinataireId: locataireId,
+          type: TypeNotification.demandeRefusee,
+          titre: 'Demande refusée',
+          corps: 'Votre demande de visite pour "$titreBien" a été refusée.',
+          lien: AppRoutes.mesDemandesVisite,
+        );
+      case StatutDemande.annulee:
+        // en général c'est le locataire qui annule → prévenir le propriétaire
+        await creerNotification(
+          destinataireId: proprietaireId,
+          type: TypeNotification.demandeAnnulee,
+          titre: 'Rendez-vous annulé',
+          corps: '$nomLocataire a annulé la visite pour "$titreBien".',
+          lien: AppRoutes.demandesVisite,
+        );
+      case StatutDemande.enAttente:
+        break;
+    }
   }
 
   // supprimer une demande de visite
@@ -272,6 +327,27 @@ class FirestoreService {
       if (destinataireId.isNotEmpty)
         'messagesNonLus.$destinataireId': FieldValue.increment(1),
     });
+
+    if (destinataireId.isNotEmpty) {
+      final nomsPar = Map<String, dynamic>.from(
+        convDoc.data()?['nomParticipant'] ?? {},
+      );
+      final nomExpediteur = nomsPar[message.expediteurId] ?? 'Quelqu\'un';
+      final apercu =
+          message.type == TypeMessage.image
+              ? '📷 Photo'
+              : (message.contenu.length > 60
+                  ? '${message.contenu.substring(0, 60)}…'
+                  : message.contenu);
+      await creerNotification(
+        destinataireId: destinataireId,
+        type: TypeNotification.message,
+        titre: 'Message de $nomExpediteur',
+        corps: apercu,
+        lien: AppRoutes.chat.replaceAll(':id', convId),
+        idFixe: 'msg_${convId}_$destinataireId',
+      );
+    }
   }
 
   // marquer un message comme lu
@@ -324,6 +400,15 @@ class FirestoreService {
   // ajouter une demande de visite
   Future<void> ajouterDemandeVisite(VisitRequestModel demande) async {
     await _db.collection('visitRequests').add(demande.toMap());
+    await creerNotification(
+      destinataireId: demande.proprietaireId,
+      type: TypeNotification.demandeVisite,
+      titre: 'Nouvelle demande de visite',
+      corps:
+          '${demande.nomLocataire} souhaite visiter '
+          '${demande.titreBien.isEmpty ? 'votre bien' : demande.titreBien}.',
+      lien: AppRoutes.demandesVisite,
+    );
   }
 
   //ALERTES
@@ -410,5 +495,72 @@ class FirestoreService {
       'traite': true,
       'dateMiseAJour': Timestamp.fromDate(DateTime.now()),
     });
+  }
+
+  // ── NOTIFICATIONS (in-app) ───────────────────────────────────────────────
+
+  Future<void> creerNotification({
+    required String destinataireId,
+    required TypeNotification type,
+    required String titre,
+    required String corps,
+    String lien = '',
+    String? idFixe,
+  }) async {
+    final donnees = {
+      'destinataireId': destinataireId,
+      'type': type.name,
+      'titre': titre,
+      'corps': corps,
+      'lien': lien,
+      'lu': false,
+      'dateCreation': Timestamp.fromDate(DateTime.now()),
+    };
+    if (idFixe != null) {
+      await _db
+          .collection('notifications')
+          .doc(idFixe)
+          .set(donnees, SetOptions(merge: true));
+    } else {
+      await _db.collection('notifications').add(donnees);
+    }
+  }
+
+  Stream<List<NotificationModel>> notificationsUtilisateur(String uid) {
+    // pas d'orderBy Firestore ici : ça imposerait un index composite
+    // (destinataireId + dateCreation). On trie côté application.
+    return _db
+        .collection('notifications')
+        .where('destinataireId', isEqualTo: uid)
+        .snapshots()
+        .map((s) {
+          final liste =
+              s.docs.map(NotificationModel.fromFirestore).toList()
+                ..sort((a, b) => b.dateCreation.compareTo(a.dateCreation));
+          return liste.take(50).toList();
+        });
+  }
+
+  Future<void> marquerNotificationLue(String id) async {
+    await _db.collection('notifications').doc(id).update({'lu': true});
+  }
+
+  Future<void> marquerToutesNotificationsLues(String uid) async {
+    final snap =
+        await _db
+            .collection('notifications')
+            .where('destinataireId', isEqualTo: uid)
+            .get();
+    final batch = _db.batch();
+    for (final doc in snap.docs) {
+      if (doc.data()['lu'] != true) {
+        batch.update(doc.reference, {'lu': true});
+      }
+    }
+    await batch.commit();
+  }
+
+  Future<void> supprimerNotification(String id) async {
+    await _db.collection('notifications').doc(id).delete();
   }
 }

@@ -4,12 +4,14 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/models/property_model.dart';
+import '../../../core/models/user_model.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
@@ -29,16 +31,31 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   final _prixCtrl = TextEditingController();
   final _surfaceCtrl = TextEditingController();
   final _piecesCtrl = TextEditingController();
+  final _chambresCtrl = TextEditingController();
+  final _toilettesCtrl = TextEditingController();
+  final _cuisinesCtrl = TextEditingController();
+  final _nomProprietaireCtrl = TextEditingController();
+  final _fraisAgenceCtrl = TextEditingController();
 
   TypeBien _typeSelectionne = TypeBien.maison;
   bool _chargement = false;
   String? _erreur;
 
-  // photos sélectionnées
+  // conditions financières
+  bool _avecCaution = false;
+  int _moisCaution = 1;
+  bool _avecAvance = false;
+  int _moisAvance = 1;
+  bool _avecFraisAgence = false;
+
+  // localisation GPS
+  GeoPoint? _localisation;
+  bool _localisationEnCours = false;
+
+  // photos
   final List<File> _photosSelectionnees = [];
   bool _uploadEnCours = false;
 
-  // Cloudinary config
   static const String _cloudName = 'dfxnwioow';
   static const String _uploadPreset = 'g1qqzyep';
 
@@ -65,10 +82,90 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     _prixCtrl.dispose();
     _surfaceCtrl.dispose();
     _piecesCtrl.dispose();
+    _chambresCtrl.dispose();
+    _toilettesCtrl.dispose();
+    _cuisinesCtrl.dispose();
+    _nomProprietaireCtrl.dispose();
+    _fraisAgenceCtrl.dispose();
     super.dispose();
   }
 
-  // sélectionner des photos depuis la galerie
+  Future<void> _obtenirLocalisation() async {
+    setState(() => _localisationEnCours = true);
+    try {
+      bool serviceActif = await Geolocator.isLocationServiceEnabled();
+      if (!serviceActif) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Activez le GPS sur votre téléphone'),
+              backgroundColor: AppColors.avertissement,
+            ),
+          );
+        setState(() => _localisationEnCours = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted)
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Permission de localisation refusée'),
+                backgroundColor: AppColors.erreur,
+              ),
+            );
+          setState(() => _localisationEnCours = false);
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Permission refusée définitivement. Activez-la dans les paramètres.',
+              ),
+              backgroundColor: AppColors.erreur,
+            ),
+          );
+        setState(() => _localisationEnCours = false);
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      setState(() {
+        _localisation = GeoPoint(position.latitude, position.longitude);
+        _localisationEnCours = false;
+      });
+
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Position enregistrée avec succès !'),
+            backgroundColor: AppColors.succes,
+          ),
+        );
+    } catch (e) {
+      setState(() => _localisationEnCours = false);
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la localisation. Réessayez.'),
+            backgroundColor: AppColors.erreur,
+          ),
+        );
+    }
+  }
+
   Future<void> _selectionnerPhotos() async {
     if (_photosSelectionnees.length >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -79,48 +176,41 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       );
       return;
     }
-
     final restantes = 5 - _photosSelectionnees.length;
     final images = await _imagePicker.pickMultiImage(limit: restantes);
-
     if (images.isNotEmpty) {
       setState(() {
         for (final img in images) {
-          if (_photosSelectionnees.length < 5) {
+          if (_photosSelectionnees.length < 5)
             _photosSelectionnees.add(File(img.path));
-          }
         }
       });
     }
   }
 
-  // supprimer une photo
-  void _supprimerPhoto(int index) {
-    setState(() => _photosSelectionnees.removeAt(index));
-  }
+  void _supprimerPhoto(int index) =>
+      setState(() => _photosSelectionnees.removeAt(index));
 
-  // uploader les photos sur Cloudinary
   Future<List<String>> _uploaderPhotos() async {
     final urls = <String>[];
     setState(() => _uploadEnCours = true);
-
     for (final photo in _photosSelectionnees) {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload'),
-      );
-      request.fields['upload_preset'] = _uploadPreset;
-      request.files.add(await http.MultipartFile.fromPath('file', photo.path));
-
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      final jsonData = jsonDecode(responseData);
-
-      if (response.statusCode == 200) {
-        urls.add(jsonData['secure_url'] as String);
-      }
+      try {
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload'),
+        );
+        request.fields['upload_preset'] = _uploadPreset;
+        request.files.add(
+          await http.MultipartFile.fromPath('file', photo.path),
+        );
+        final response = await request.send();
+        final responseData = await response.stream.bytesToString();
+        final jsonData = jsonDecode(responseData);
+        if (response.statusCode == 200)
+          urls.add(jsonData['secure_url'] as String);
+      } catch (e) {}
     }
-
     setState(() => _uploadEnCours = false);
     return urls;
   }
@@ -140,7 +230,6 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       _chargement = true;
       _erreur = null;
     });
-
     final messager = ScaffoldMessenger.of(context);
     final nav = GoRouter.of(context);
 
@@ -148,16 +237,18 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
       if (utilisateur == null) return;
 
-      // upload des photos si sélectionnées
       List<String> photosUrls = [];
-      if (_photosSelectionnees.isNotEmpty) {
-        photosUrls = await _uploaderPhotos();
-      }
+      if (_photosSelectionnees.isNotEmpty) photosUrls = await _uploaderPhotos();
 
       final bien = PropertyModel(
         id: '',
         proprietaireId: utilisateur.uid,
         proprietaireRole: utilisateur.role.name,
+        nomProprietaireReel:
+            utilisateur.role == UserRole.agent &&
+                    _nomProprietaireCtrl.text.trim().isNotEmpty
+                ? _nomProprietaireCtrl.text.trim()
+                : null,
         titre: _titreCtrl.text.trim(),
         description: _descCtrl.text.trim(),
         type: _typeSelectionne,
@@ -165,21 +256,31 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
         prix: double.tryParse(_prixCtrl.text.trim()) ?? 0,
         surface: double.tryParse(_surfaceCtrl.text.trim()),
         nombrePieces: int.tryParse(_piecesCtrl.text.trim()),
+        nombreChambres: int.tryParse(_chambresCtrl.text.trim()),
+        nombreToilettes: int.tryParse(_toilettesCtrl.text.trim()),
+        nombreCuisines: int.tryParse(_cuisinesCtrl.text.trim()),
         adresse: _adresseCtrl.text.trim(),
         ville: _villeCtrl.text.trim(),
         quartier:
             _quartierCtrl.text.trim().isEmpty
                 ? null
                 : _quartierCtrl.text.trim(),
-        localisation: const GeoPoint(9.5370, -13.6773),
+        localisation: _localisation ?? const GeoPoint(9.5370, -13.6773),
         equipements: _equipementsSelectionnes,
         photos: photosUrls,
+        moisCaution: _avecCaution ? _moisCaution : null,
+        moisAvance: _avecAvance ? _moisAvance : null,
+        fraisAgence:
+            utilisateur.role == UserRole.agent &&
+                    _avecFraisAgence &&
+                    _fraisAgenceCtrl.text.trim().isNotEmpty
+                ? double.tryParse(_fraisAgenceCtrl.text.trim())
+                : null,
         datePublication: DateTime.now(),
         dateMiseAJour: DateTime.now(),
       );
 
       await _firestoreService.ajouterBien(bien);
-
       messager.showSnackBar(
         const SnackBar(
           content: Text('Bien publié avec succès !'),
@@ -190,12 +291,15 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     } catch (e) {
       setState(() => _erreur = 'Erreur lors de la publication. Réessayez.');
     } finally {
-      setState(() => _chargement = false);
+      if (mounted) setState(() => _chargement = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final utilisateur = ref.watch(utilisateurActuelProvider).asData?.value;
+    final estAgent = utilisateur?.role == UserRole.agent;
+
     return Scaffold(
       backgroundColor: AppColors.fond,
       appBar: AppBar(
@@ -205,17 +309,57 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
           'Publier un bien',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // type de bien
+            // ── SECTION AGENT ──
+            if (estAgent) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.bleuClair,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.bleuFonce.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: AppColors.bleuFonce,
+                          size: 16,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Vous publiez en tant qu\'agent',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.bleuFonce,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _champTexte(
+                      'Nom du propriétaire du bien *',
+                      'Ex: Mamadou Diallo',
+                      _nomProprietaireCtrl,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ── TYPE DE BIEN ──
             _titreSectionn('Type de bien *'),
             const SizedBox(height: 10),
             SingleChildScrollView(
@@ -269,7 +413,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ── SECTION PHOTOS ──
+            // ── PHOTOS ──
             _titreSectionn('Photos du logement (max 5)'),
             const SizedBox(height: 10),
             SizedBox(
@@ -277,7 +421,6 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  // bouton ajouter photo
                   if (_photosSelectionnees.length < 5)
                     GestureDetector(
                       onTap: _selectionnerPhotos,
@@ -288,10 +431,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.grisClair,
-                            style: BorderStyle.solid,
-                          ),
+                          border: Border.all(color: AppColors.grisClair),
                         ),
                         child: const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -313,8 +453,6 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                         ),
                       ),
                     ),
-
-                  // photos sélectionnées
                   ..._photosSelectionnees.asMap().entries.map((entry) {
                     final index = entry.key;
                     final photo = entry.value;
@@ -403,7 +541,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             ],
             const SizedBox(height: 20),
 
-            // informations de base
+            // ── INFORMATIONS GÉNÉRALES ──
             _titreSectionn('Informations générales'),
             const SizedBox(height: 10),
             _champTexte(
@@ -420,7 +558,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             ),
             const SizedBox(height: 20),
 
-            // localisation
+            // ── LOCALISATION ──
             _titreSectionn('Localisation'),
             const SizedBox(height: 10),
             _champTexte('Ville *', 'Ex: Conakry', _villeCtrl),
@@ -432,9 +570,88 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             ),
             const SizedBox(height: 12),
             _champTexte('Quartier', 'Ex: Kaloum, Dixinn...', _quartierCtrl),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: _localisationEnCours ? null : _obtenirLocalisation,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color:
+                      _localisation != null
+                          ? AppColors.succes.withValues(alpha: 0.1)
+                          : AppColors.bleuClair,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color:
+                        _localisation != null
+                            ? AppColors.succes
+                            : AppColors.bleuFonce.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    _localisationEnCours
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : Icon(
+                          _localisation != null
+                              ? Icons.location_on
+                              : Icons.location_searching,
+                          color:
+                              _localisation != null
+                                  ? AppColors.succes
+                                  : AppColors.bleuFonce,
+                          size: 22,
+                        ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _localisation != null
+                                ? '✅ Position GPS enregistrée'
+                                : 'Enregistrer ma position GPS',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  _localisation != null
+                                      ? AppColors.succes
+                                      : AppColors.bleuFonce,
+                            ),
+                          ),
+                          Text(
+                            _localisation != null
+                                ? 'Lat: ${_localisation!.latitude.toStringAsFixed(4)}, Lng: ${_localisation!.longitude.toStringAsFixed(4)}'
+                                : 'Appuyez pour localiser le bien sur la carte',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondaire,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_localisation != null)
+                      GestureDetector(
+                        onTap: () => setState(() => _localisation = null),
+                        child: const Icon(
+                          Icons.refresh,
+                          color: AppColors.textSecondaire,
+                          size: 18,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
 
-            // détails
+            // ── DÉTAILS ──
             _titreSectionn('Détails du bien'),
             const SizedBox(height: 10),
             Row(
@@ -465,9 +682,163 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               _piecesCtrl,
               type: TextInputType.number,
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _champTexte(
+                    '🛏️ Chambres',
+                    'Ex: 2',
+                    _chambresCtrl,
+                    type: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _champTexte(
+                    '🚿 Toilettes',
+                    'Ex: 1',
+                    _toilettesCtrl,
+                    type: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _champTexte(
+                    '🍳 Cuisines',
+                    'Ex: 1',
+                    _cuisinesCtrl,
+                    type: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
 
-            // équipements
+            // ── CONDITIONS FINANCIÈRES ──
+            _titreSectionn('Conditions financières'),
+            const SizedBox(height: 10),
+
+            // caution
+            _carteCondition(
+              titre: '🔒 Caution',
+              description: 'Demander une caution remboursable',
+              active: _avecCaution,
+              onChanged: (val) => setState(() => _avecCaution = val),
+              contenu:
+                  _avecCaution
+                      ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Nombre de mois :',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.texte,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              _boutonMois(() {
+                                if (_moisCaution > 1)
+                                  setState(() => _moisCaution--);
+                              }, Icons.remove),
+                              const SizedBox(width: 16),
+                              Text(
+                                '$_moisCaution mois',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.bleuFonce,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              _boutonMois(() {
+                                if (_moisCaution < 12)
+                                  setState(() => _moisCaution++);
+                              }, Icons.add),
+                            ],
+                          ),
+                        ],
+                      )
+                      : null,
+            ),
+            const SizedBox(height: 10),
+
+            // avance
+            _carteCondition(
+              titre: '📅 Avance',
+              description: 'Demander un paiement en avance',
+              active: _avecAvance,
+              onChanged: (val) => setState(() => _avecAvance = val),
+              contenu:
+                  _avecAvance
+                      ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Nombre de mois :',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.texte,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              _boutonMois(() {
+                                if (_moisAvance > 1)
+                                  setState(() => _moisAvance--);
+                              }, Icons.remove),
+                              const SizedBox(width: 16),
+                              Text(
+                                '$_moisAvance mois',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.bleuFonce,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              _boutonMois(() {
+                                if (_moisAvance < 24)
+                                  setState(() => _moisAvance++);
+                              }, Icons.add),
+                            ],
+                          ),
+                        ],
+                      )
+                      : null,
+            ),
+
+            // frais agence (agents seulement)
+            if (estAgent) ...[
+              const SizedBox(height: 10),
+              _carteCondition(
+                titre: '💼 Frais d\'agence',
+                description: 'Ajouter des frais d\'agence',
+                active: _avecFraisAgence,
+                onChanged: (val) => setState(() => _avecFraisAgence = val),
+                contenu:
+                    _avecFraisAgence
+                        ? Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: _champTexte(
+                            'Montant des frais (GNF)',
+                            'Ex: 150000',
+                            _fraisAgenceCtrl,
+                            type: TextInputType.number,
+                          ),
+                        )
+                        : null,
+              ),
+            ],
+            const SizedBox(height: 20),
+
+            // ── ÉQUIPEMENTS ──
             _titreSectionn('Équipements disponibles'),
             const SizedBox(height: 10),
             Wrap(
@@ -514,16 +885,24 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             ),
             const SizedBox(height: 28),
 
-            // message d'erreur
             if (_erreur != null) ...[
-              Text(
-                _erreur!,
-                style: const TextStyle(color: AppColors.erreur, fontSize: 13),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.erreur.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.erreur.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  _erreur!,
+                  style: const TextStyle(color: AppColors.erreur, fontSize: 13),
+                ),
               ),
               const SizedBox(height: 12),
             ],
 
-            // bouton publier
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -551,6 +930,79 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _carteCondition({
+    required String titre,
+    required String description,
+    required bool active,
+    required ValueChanged<bool> onChanged,
+    Widget? contenu,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: active ? AppColors.bleuClair : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color:
+              active
+                  ? AppColors.bleuFonce.withValues(alpha: 0.3)
+                  : AppColors.grisClair,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      titre,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.texte,
+                      ),
+                    ),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondaire,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: active,
+                onChanged: onChanged,
+                activeColor: AppColors.bleuFonce,
+              ),
+            ],
+          ),
+          if (contenu != null) contenu,
+        ],
+      ),
+    );
+  }
+
+  Widget _boutonMois(VoidCallback onTap, IconData icone) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppColors.bleuFonce,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icone, color: Colors.white, size: 18),
       ),
     );
   }

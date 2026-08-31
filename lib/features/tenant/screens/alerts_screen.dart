@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class AlertsScreen extends ConsumerStatefulWidget {
@@ -72,10 +73,6 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
         title: const Text(
           'Mes alertes',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
         ),
       ),
       body: SingleChildScrollView(
@@ -226,17 +223,35 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                 stream: _firestoreService.alertesLocataire(utilisateur.uid),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Shimmer(
+                      child: Column(
+                        children: [
+                          SkeletonBox(
+                            height: 64,
+                            radius: 12,
+                            width: double.infinity,
+                          ),
+                          SizedBox(height: 12),
+                          SkeletonBox(
+                            height: 64,
+                            radius: 12,
+                            width: double.infinity,
+                          ),
+                        ],
+                      ),
+                    );
                   }
                   final alertes = snapshot.data ?? [];
                   if (alertes.isEmpty) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Text(
-                          'Aucune alerte active',
-                          style: TextStyle(color: AppColors.textSecondaire),
-                        ),
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: EmptyState(
+                        icone: Icons.notifications_none,
+                        titre: 'Aucune alerte active',
+                        message:
+                            'Créez une alerte ci-dessus : vous serez prévenu '
+                            'dès qu\'une annonce correspond à vos critères.',
+                        couleur: AppColors.bleuFonce,
                       ),
                     );
                   }
