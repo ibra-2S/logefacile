@@ -46,6 +46,19 @@ class FirestoreService {
         .map((s) => s.docs.map(PropertyModel.fromFirestore).toList());
   }
 
+  /// Biens d'un propriétaire/agent en une seule lecture, sans orderBy
+  /// (pas d'index composite requis) — pour la fiche admin.
+  Future<List<PropertyModel>> biensProprietaireUneFois(
+    String proprietaireId,
+  ) async {
+    final snap =
+        await _db
+            .collection('properties')
+            .where('proprietaireId', isEqualTo: proprietaireId)
+            .get();
+    return snap.docs.map(PropertyModel.fromFirestore).toList();
+  }
+
   Stream<List<PropertyModel>> tousLesBiens() {
     return _db
         .collection('properties')
@@ -454,6 +467,13 @@ class FirestoreService {
 
   //ADMIN
 
+  // récupérer un utilisateur par son id (lecture unique)
+  Future<UserModel?> utilisateurParId(String uid) async {
+    if (uid.isEmpty) return null;
+    final doc = await _db.collection('users').doc(uid).get();
+    return doc.exists ? UserModel.fromFirestore(doc) : null;
+  }
+
   // récupérer tous les utilisateurs
   Stream<List<UserModel>> tousLesUtilisateurs() {
     return _db
@@ -535,14 +555,22 @@ class FirestoreService {
         .snapshots()
         .map((s) {
           final liste =
-              s.docs.map(NotificationModel.fromFirestore).toList()
+              s.docs
+                  .map(NotificationModel.fromFirestore)
+                  // masquée 24 h après ouverture (voir nettoyerNotificationsExpirees)
+                  .where((n) => !n.estExpiree)
+                  .toList()
                 ..sort((a, b) => b.dateCreation.compareTo(a.dateCreation));
           return liste.take(50).toList();
         });
   }
 
   Future<void> marquerNotificationLue(String id) async {
-    await _db.collection('notifications').doc(id).update({'lu': true});
+    final ref = _db.collection('notifications').doc(id);
+    final doc = await ref.get();
+    // ne pas réinitialiser l'horloge des 24 h si déjà lue
+    if (!doc.exists || doc.data()?['lu'] == true) return;
+    await ref.update({'lu': true, 'luLe': Timestamp.fromDate(DateTime.now())});
   }
 
   Future<void> marquerToutesNotificationsLues(String uid) async {
@@ -551,13 +579,38 @@ class FirestoreService {
             .collection('notifications')
             .where('destinataireId', isEqualTo: uid)
             .get();
+    final maintenant = Timestamp.fromDate(DateTime.now());
     final batch = _db.batch();
     for (final doc in snap.docs) {
       if (doc.data()['lu'] != true) {
-        batch.update(doc.reference, {'lu': true});
+        batch.update(doc.reference, {'lu': true, 'luLe': maintenant});
       }
     }
     await batch.commit();
+  }
+
+  /// Supprime définitivement les notifications lues depuis plus de 24 h.
+  /// Appelée à l'ouverture de l'écran des notifications.
+  Future<void> nettoyerNotificationsExpirees(String uid) async {
+    final limite = DateTime.now().subtract(const Duration(hours: 24));
+    final snap =
+        await _db
+            .collection('notifications')
+            .where('destinataireId', isEqualTo: uid)
+            .get();
+    final batch = _db.batch();
+    var aSupprimer = 0;
+    for (final doc in snap.docs) {
+      final d = doc.data();
+      final luLe = d['luLe'];
+      if (d['lu'] == true &&
+          luLe is Timestamp &&
+          luLe.toDate().isBefore(limite)) {
+        batch.delete(doc.reference);
+        aSupprimer++;
+      }
+    }
+    if (aSupprimer > 0) await batch.commit();
   }
 
   Future<void> supprimerNotification(String id) async {

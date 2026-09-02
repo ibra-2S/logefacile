@@ -26,14 +26,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   static const _slides = <_Slide>[
     _Slide(
-      Icons.travel_explore,
+      Icons.search_outlined,
       AppColors.tealLocataire,
       'Trouvez votre logement',
       'Des centaines d\'annonces à Conakry et ses communes, filtrées selon '
           'votre budget et vos besoins.',
     ),
     _Slide(
-      Icons.event_available,
+      Icons.event_available_outlined,
       AppColors.bleuFonce,
       'Visitez en toute confiance',
       'Demandez une visite en un tap et suivez l\'état de vos rendez-vous '
@@ -47,7 +47,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'sans frais cachés.',
     ),
     _Slide(
-      Icons.insights,
+      Icons.analytics_outlined,
       AppColors.vertProprietaire,
       'Propriétaire ? Publiez gratuitement',
       'Mettez vos biens en ligne et suivez leurs performances : vues, '

@@ -1,3 +1,10 @@
+# Secrets / config locale (ne jamais committer)
+*.env
+.env*
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+android/app/src/**/google-services.json
+
 # Miscellaneous
 *.class
 *.log

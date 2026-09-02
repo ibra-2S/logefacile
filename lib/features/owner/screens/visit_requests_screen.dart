@@ -59,7 +59,7 @@ class VisitRequestsScreen extends ConsumerWidget {
                           SizedBox(
                             height: MediaQuery.of(context).size.height * 0.6,
                             child: const EmptyState(
-                              icone: Icons.event_note,
+                              icone: Icons.event_note_outlined,
                               titre: 'Aucune demande reçue',
                               message:
                                   'Quand un locataire demandera à visiter un '

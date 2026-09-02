@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_routes.dart';
+import '../features/admin/screens/admin_properties_screen.dart';
 import '../features/admin/screens/admin_shell.dart';
+import '../features/admin/screens/admin_stats_screen.dart';
 import '../features/admin/screens/reports_screen.dart';
 import '../features/admin/screens/users_management_screen.dart';
 import '../features/auth/providers/auth_provider.dart';
@@ -150,6 +152,14 @@ final routeurApp = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.signalements,
         builder: (context, state) => const ReportsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.statistiquesAdmin,
+        builder: (context, state) => const AdminStatsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.biensAdmin,
+        builder: (context, state) => const AdminPropertiesScreen(),
       ),
 
       // profil - paramètres et support

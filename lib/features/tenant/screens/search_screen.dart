@@ -8,6 +8,7 @@ import '../../../core/models/property_model.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../core/widgets/cloche_notifications.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/property_photo.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
@@ -690,28 +691,7 @@ class _CarteBien extends StatelessWidget {
           children: [
             Hero(
               tag: 'bienPhoto_${bien.id}',
-              child: Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  color: AppColors.bleuClair,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  image:
-                      bien.photos.isNotEmpty
-                          ? DecorationImage(
-                            image: NetworkImage(bien.photos.first),
-                            fit: BoxFit.cover,
-                          )
-                          : null,
-                ),
-                child:
-                    bien.photos.isEmpty
-                        ? const Center(
-                          child: Text('🏠', style: TextStyle(fontSize: 48)),
-                        )
-                        : null,
-              ),
+              child: PropertyPhoto(photos: bien.photos, height: 120),
             ),
             Padding(
               padding: const EdgeInsets.all(14),

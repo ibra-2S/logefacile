@@ -39,4 +39,6 @@ class AppRoutes {
   static const tableauBordAdmin = '/admin';
   static const gestionUtilisateurs = '/admin/utilisateurs';
   static const signalements = '/admin/signalements';
+  static const statistiquesAdmin = '/admin/statistiques';
+  static const biensAdmin = '/admin/biens';
 }

@@ -332,7 +332,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                             )
                             : const Icon(
-                              Icons.camera_alt,
+                              Icons.camera_alt_outlined,
                               color: AppColors.bleuFonce,
                               size: 14,
                             ),

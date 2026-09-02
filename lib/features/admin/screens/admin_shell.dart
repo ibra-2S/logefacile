@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/constants/app_colors.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/loge_bottom_nav.dart';
 import '../../profile/screens/profile_screen.dart';
 import 'admin_dashboard.dart';
 import 'admin_properties_screen.dart';
@@ -41,44 +41,34 @@ class _AdminShellState extends ConsumerState<AdminShell> {
           final signalementsEnAttente =
               signalements.where((s) => s['traite'] != true).length;
 
-          return NavigationBar(
-            selectedIndex: _indexActuel,
-            onDestinationSelected:
-                (index) => setState(() => _indexActuel = index),
-            backgroundColor: Colors.white,
-            indicatorColor: AppColors.bleuClair,
-            destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard, color: AppColors.bleuFonce),
+          return LogeBottomNav(
+            currentIndex: _indexActuel,
+            onTap: (index) => setState(() => _indexActuel = index),
+            items: [
+              const LogeNavItem(
+                icone: Icons.dashboard_outlined,
+                iconeActive: Icons.dashboard,
                 label: 'Dashboard',
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people, color: AppColors.bleuFonce),
+              const LogeNavItem(
+                icone: Icons.people_outline,
+                iconeActive: Icons.people,
                 label: 'Utilisateurs',
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.home_work_outlined),
-                selectedIcon: Icon(Icons.home_work, color: AppColors.bleuFonce),
+              const LogeNavItem(
+                icone: Icons.home_work_outlined,
+                iconeActive: Icons.home_work,
                 label: 'Biens',
               ),
-              NavigationDestination(
-                icon: Badge(
-                  isLabelVisible: signalementsEnAttente > 0,
-                  label: Text('$signalementsEnAttente'),
-                  child: const Icon(Icons.flag_outlined),
-                ),
-                selectedIcon: Badge(
-                  isLabelVisible: signalementsEnAttente > 0,
-                  label: Text('$signalementsEnAttente'),
-                  child: const Icon(Icons.flag, color: AppColors.bleuFonce),
-                ),
+              LogeNavItem(
+                icone: Icons.flag_outlined,
+                iconeActive: Icons.flag,
                 label: 'Signalements',
+                badge: signalementsEnAttente,
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person, color: AppColors.bleuFonce),
+              const LogeNavItem(
+                icone: Icons.person_outline,
+                iconeActive: Icons.person,
                 label: 'Profil',
               ),
             ],

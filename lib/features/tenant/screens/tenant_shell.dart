@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/constants/app_colors.dart';
 import '../../../core/models/message_model.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/loge_bottom_nav.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../../chat/screens/conversations_screen.dart';
@@ -23,12 +23,13 @@ class TenantShell extends ConsumerStatefulWidget {
 class _TenantShellState extends ConsumerState<TenantShell> {
   int _indexActuel = 0;
 
+  // Favoris est placé au centre (bouton rond surélevé) — index 2
   final List<Widget> _ecrans = const [
-    SearchScreen(),
-    FavoritesScreen(),
-    MyRequestsScreen(),
-    ConversationsScreen(),
-    ProfileScreen(),
+    SearchScreen(), // 0 Recherche
+    MyRequestsScreen(), // 1 Demandes
+    FavoritesScreen(), // 2 Favoris (centre)
+    ConversationsScreen(), // 3 Messages
+    ProfileScreen(), // 4 Profil
   ];
 
   @override
@@ -40,80 +41,51 @@ class _TenantShellState extends ConsumerState<TenantShell> {
 
     return Scaffold(
       body: IndexedStack(index: _indexActuel, children: _ecrans),
-      bottomNavigationBar:
-          utilisateur == null
-              ? null
-              : StreamBuilder<List<ConversationModel>>(
-                stream: firestoreService.conversationsUtilisateur(
-                  utilisateur.uid,
-                ),
-                builder: (context, snapshot) {
-                  final conversations = snapshot.data ?? [];
-                  final messagesNonLus = conversations.fold<int>(
-                    0,
-                    (total, conv) =>
-                        total + (conv.messagesNonLus[utilisateur.uid] ?? 0),
-                  );
+      bottomNavigationBar: StreamBuilder<List<ConversationModel>>(
+        stream: firestoreService.conversationsUtilisateur(utilisateur.uid),
+        builder: (context, snapshot) {
+          final conversations = snapshot.data ?? [];
+          final messagesNonLus = conversations.fold<int>(
+            0,
+            (total, conv) =>
+                total + (conv.messagesNonLus[utilisateur.uid] ?? 0),
+          );
 
-                  return NavigationBar(
-                    selectedIndex: _indexActuel,
-                    onDestinationSelected:
-                        (index) => setState(() => _indexActuel = index),
-                    backgroundColor: Colors.white,
-                    indicatorColor: AppColors.bleuClair,
-                    destinations: [
-                      const NavigationDestination(
-                        icon: Icon(Icons.search_outlined),
-                        selectedIcon: Icon(
-                          Icons.search,
-                          color: AppColors.bleuFonce,
-                        ),
-                        label: 'Recherche',
-                      ),
-                      const NavigationDestination(
-                        icon: Icon(Icons.favorite_outline),
-                        selectedIcon: Icon(
-                          Icons.favorite,
-                          color: AppColors.bleuFonce,
-                        ),
-                        label: 'Favoris',
-                      ),
-                      const NavigationDestination(
-                        icon: Icon(Icons.calendar_today_outlined),
-                        selectedIcon: Icon(
-                          Icons.calendar_today,
-                          color: AppColors.bleuFonce,
-                        ),
-                        label: 'Demandes',
-                      ),
-                      NavigationDestination(
-                        icon: Badge(
-                          isLabelVisible: messagesNonLus > 0,
-                          label: Text('$messagesNonLus'),
-                          child: const Icon(Icons.chat_bubble_outline),
-                        ),
-                        selectedIcon: Badge(
-                          isLabelVisible: messagesNonLus > 0,
-                          label: Text('$messagesNonLus'),
-                          child: const Icon(
-                            Icons.chat_bubble,
-                            color: AppColors.bleuFonce,
-                          ),
-                        ),
-                        label: 'Messages',
-                      ),
-                      const NavigationDestination(
-                        icon: Icon(Icons.person_outline),
-                        selectedIcon: Icon(
-                          Icons.person,
-                          color: AppColors.bleuFonce,
-                        ),
-                        label: 'Profil',
-                      ),
-                    ],
-                  );
-                },
+          return LogeBottomNav(
+            currentIndex: _indexActuel,
+            onTap: (index) => setState(() => _indexActuel = index),
+            centerIndex: 2,
+            items: [
+              const LogeNavItem(
+                icone: Icons.search_outlined,
+                iconeActive: Icons.search,
+                label: 'Recherche',
               ),
+              const LogeNavItem(
+                icone: Icons.calendar_today_outlined,
+                iconeActive: Icons.calendar_today,
+                label: 'Demandes',
+              ),
+              const LogeNavItem(
+                icone: Icons.favorite_outline,
+                iconeActive: Icons.favorite,
+                label: 'Favoris',
+              ),
+              LogeNavItem(
+                icone: Icons.chat_bubble_outline,
+                iconeActive: Icons.chat_bubble,
+                label: 'Messages',
+                badge: messagesNonLus,
+              ),
+              const LogeNavItem(
+                icone: Icons.person_outline,
+                iconeActive: Icons.person,
+                label: 'Profil',
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/property_photo.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
@@ -130,28 +131,13 @@ class _CarteFavori extends StatelessWidget {
         child: Row(
           children: [
             // image
-            Container(
-              width: 110,
+            PropertyPhoto(
+              photos: bien.photos,
               height: 110,
-              decoration: BoxDecoration(
-                color: AppColors.bleuClair,
-                borderRadius: const BorderRadius.horizontal(
-                  left: Radius.circular(16),
-                ),
-                image:
-                    bien.photos.isNotEmpty
-                        ? DecorationImage(
-                          image: NetworkImage(bien.photos.first),
-                          fit: BoxFit.cover,
-                        )
-                        : null,
+              width: 110,
+              borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(16),
               ),
-              child:
-                  bien.photos.isEmpty
-                      ? const Center(
-                        child: Text('🏠', style: TextStyle(fontSize: 32)),
-                      )
-                      : null,
             ),
 
             // infos

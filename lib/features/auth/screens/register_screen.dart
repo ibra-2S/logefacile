@@ -439,7 +439,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               decoration: _deco('6 caractères minimum').copyWith(
                 suffixIcon: IconButton(
                   icon: Icon(
-                    _mdpVisible ? Icons.visibility_off : Icons.visibility,
+                    _mdpVisible
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                   ),
                   onPressed:
                       () => setState(() => _mdpVisible = !_mdpVisible),

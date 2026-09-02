@@ -7,6 +7,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/stats_periode_card.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class AdminDashboard extends ConsumerWidget {
@@ -43,25 +44,12 @@ class AdminDashboard extends ConsumerWidget {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline, color: Colors.white),
-            onPressed: () => context.push(AppRoutes.profil),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () async {
-              await ref.read(authNotifierProvider.notifier).deconnecter();
-              if (context.mounted) context.go(AppRoutes.connexion);
-            },
-          ),
-        ],
       ),
       body: StreamBuilder<List<UserModel>>(
         stream: firestoreService.tousLesUtilisateurs(),
         builder: (context, snapshotUsers) {
           return StreamBuilder<List<PropertyModel>>(
-            stream: firestoreService.rechercherBiens(),
+            stream: firestoreService.tousLesBiens(),
             builder: (context, snapshotBiens) {
               return StreamBuilder<List<Map<String, dynamic>>>(
                 stream: firestoreService.tousLesSignalements(),
@@ -160,6 +148,68 @@ class AdminDashboard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 24),
 
+                        // graphes de statistiques
+                        const Text(
+                          'Statistiques',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.texte,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        StatsPeriodeCard(
+                          titre: 'Biens publiés',
+                          icone: Icons.home_work_outlined,
+                          couleur: AppColors.vertProprietaire,
+                          evenements:
+                              biens.map((b) => b.datePublication).toList(),
+                        ),
+                        StatsPeriodeCard(
+                          titre: 'Inscriptions des utilisateurs',
+                          icone: Icons.group_add_outlined,
+                          couleur: AppColors.bleuMoyen,
+                          evenements: users.map((u) => u.dateCreation).toList(),
+                        ),
+                        StatsPeriodeCard(
+                          titre: 'Fréquence de connexion',
+                          sousTitre: 'dernière connexion par compte',
+                          icone: Icons.login_rounded,
+                          couleur: AppColors.tealLocataire,
+                          courbe: true,
+                          evenements: users.map((u) => u.derniereCo).toList(),
+                        ),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed:
+                                () => context.push(AppRoutes.statistiquesAdmin),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.bleuFonce,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Plus de statistiques',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(Icons.arrow_forward, size: 16),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
                         // actions admin
                         const Text(
                           'Gestion',
@@ -175,7 +225,6 @@ class AdminDashboard extends ConsumerWidget {
                           label: 'Gérer les utilisateurs',
                           description:
                               'Voir, suspendre ou supprimer des comptes',
-                          badge: users.length,
                           onTap:
                               () => context.push(AppRoutes.gestionUtilisateurs),
                         ),
@@ -192,8 +241,7 @@ class AdminDashboard extends ConsumerWidget {
                           icon: Icons.home_work_outlined,
                           label: 'Tous les biens',
                           description: 'Modérer les annonces publiées',
-                          badge: biens.length,
-                          onTap: () => context.push('/admin/biens'),
+                          onTap: () => context.push(AppRoutes.biensAdmin),
                         ),
                       ],
                     ),

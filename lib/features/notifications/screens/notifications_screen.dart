@@ -9,13 +9,31 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  final _service = FirestoreService();
+
+  @override
+  void initState() {
+    super.initState();
+    // à l'ouverture : purge les notifications lues depuis plus de 24 h
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final uid = ref.read(utilisateurActuelProvider).asData?.value?.uid;
+      if (uid != null) _service.nettoyerNotificationsExpirees(uid);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final utilisateur = ref.watch(utilisateurActuelProvider).asData?.value;
-    final service = FirestoreService();
+    final service = _service;
 
     return Scaffold(
       backgroundColor: AppColors.fond,

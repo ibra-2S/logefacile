@@ -7,6 +7,11 @@ class AppColors {
   static const bleuMoyen = Color(0xFF1565C0);
   static const bleuClair = Color(0xFFE3F2FD);
 
+  // bleu marine de la navigation / éléments de marque (style « Guinée Dorée »)
+  static const marine = Color(0xFF1A2B6D);
+  // gris des libellés inactifs
+  static const labelInactif = Color(0xFF6B7280);
+
   // couleurs des rôles
   static const vertProprietaire = Color(0xFF2E7D32);
   static const bleuAgent = Color(0xFF1565C0);

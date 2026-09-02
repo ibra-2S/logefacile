@@ -10,7 +10,9 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/models/visit_request_model.dart';
+import '../../../core/services/contact_service.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/whatsapp_logo.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class PropertyDetailScreen extends ConsumerStatefulWidget {
@@ -125,9 +127,90 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
       return {
         'nomComplet': doc.data()?['nomComplet'] ?? '',
         'photoUrl': doc.data()?['photoUrl'] ?? '',
+        'telephone': doc.data()?['telephone'] ?? '',
       };
     }
-    return {'nomComplet': '', 'photoUrl': ''};
+    return {'nomComplet': '', 'photoUrl': '', 'telephone': ''};
+  }
+
+  String _messageWhatsApp(PropertyModel bien) =>
+      'Bonjour, je suis intéressé(e) par votre annonce « ${bien.titre} » '
+      'vue sur LogeFacile. Est-elle toujours disponible ?';
+
+  Future<void> _ouvrirWhatsApp(String? telephone, PropertyModel bien) async {
+    final ok = await ContactService.ouvrirWhatsApp(
+      telephone: telephone,
+      message: _messageWhatsApp(bien),
+    );
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Impossible d'ouvrir WhatsApp pour ce contact."),
+        backgroundColor: AppColors.erreur,
+      ),
+    );
+  }
+
+  /// petit menu : message dans l'app ou WhatsApp
+  Future<void> _choisirModeContact(PropertyModel bien) async {
+    final infos = await _obtenirInfosProprietaire(bien.proprietaireId);
+    final telephone = infos['telephone'] ?? '';
+    final aWhatsApp = ContactService.aUnNumero(telephone);
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.texteLeger,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(
+                Icons.chat_bubble_outline,
+                color: AppColors.bleuFonce,
+              ),
+              title: const Text('Envoyer un message dans l\'app'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _contacterProprietaire(bien);
+              },
+            ),
+            ListTile(
+              enabled: aWhatsApp,
+              leading: WhatsAppLogo(
+                size: 24,
+                color: aWhatsApp ? WhatsAppLogo.vert : AppColors.texteLeger,
+              ),
+              title: const Text('Contacter sur WhatsApp'),
+              subtitle: aWhatsApp
+                  ? null
+                  : const Text('Numéro non renseigné par ce contact'),
+              onTap: aWhatsApp
+                  ? () {
+                      Navigator.pop(ctx);
+                      _ouvrirWhatsApp(telephone, bien);
+                    }
+                  : null,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _demanderVisite(PropertyModel bien) async {
@@ -612,7 +695,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                           Row(
                             children: [
                               const Icon(
-                                Icons.access_time,
+                                Icons.access_time_outlined,
                                 size: 14,
                                 color: AppColors.texteLeger,
                               ),
@@ -1074,7 +1157,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
               child: OutlinedButton.icon(
                 onPressed: () {
                   final bien = _bien;
-                  if (bien != null) _contacterProprietaire(bien);
+                  if (bien != null) _choisirModeContact(bien);
                 },
                 icon: const Icon(
                   Icons.chat_bubble_outline,
@@ -1306,6 +1389,31 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ],
+                  if (ContactService.aUnNumero(proprio.telephone)) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            _ouvrirWhatsApp(proprio.telephone, bien),
+                        icon: const WhatsAppLogo(size: 18, color: Colors.white),
+                        label: Text(
+                          estAgent
+                              ? "Contacter l'agent sur WhatsApp"
+                              : 'Contacter sur WhatsApp',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: WhatsAppLogo.vert,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ],

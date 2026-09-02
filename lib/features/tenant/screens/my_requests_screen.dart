@@ -50,7 +50,7 @@ class MyRequestsScreen extends ConsumerWidget {
                           SizedBox(
                             height: MediaQuery.of(context).size.height * 0.6,
                             child: const EmptyState(
-                              icone: Icons.event_available,
+                              icone: Icons.event_available_outlined,
                               titre: 'Aucune demande de visite',
                               message:
                                   'Trouvez un logement qui vous plaît et '
