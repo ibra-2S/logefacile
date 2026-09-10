@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -57,6 +54,14 @@ class DefaultFirebaseOptions {
     appId: '1:344633483640:android:368318c5a3914dc404a88d',
     messagingSenderId: '344633483640',
     projectId: 'logefacile-c0680',
+    storageBucket: 'logefacile-c0680.firebasestorage.app',
+  );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyD_FLHlzV5WO6zrp3jR6PQfBVf6SWHPT1E',
+    appId: '1:344633483640:web:fc18c589e71754b704a88d',
+    messagingSenderId: '344633483640',
+    projectId: 'logefacile-c0680',
+    authDomain: 'logefacile-c0680.firebaseapp.com',
     storageBucket: 'logefacile-c0680.firebasestorage.app',
   );
 }

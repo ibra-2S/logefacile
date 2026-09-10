@@ -10,7 +10,6 @@ import '../../../core/models/property_model.dart';
 import '../../../core/models/visit_request_model.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../core/services/stats_pdf_service.dart';
-import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/cloche_notifications.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
@@ -35,7 +34,20 @@ class OwnerDashboard extends ConsumerWidget {
             ),
           ),
         ),
-        title: const LogeFacileWordmark(height: 30, monoColor: Colors.white),
+        title: Row(
+          children: [
+            Image.asset('assets/images/icone.png', height: 30, width: 30),
+            const SizedBox(width: 8),
+            const Text(
+              'LogeFacile',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
         actions: [
           if (utilisateur != null) ClocheNotifications(uid: utilisateur.uid),
           const SizedBox(width: 4),

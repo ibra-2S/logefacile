@@ -19,7 +19,8 @@
         "lib/firebase_options.dart": {
           "projectId": "logefacile-c0680",
           "configurations": {
-            "android": "1:344633483640:android:368318c5a3914dc404a88d"
+            "android": "1:344633483640:android:368318c5a3914dc404a88d",
+            "web": "1:344633483640:web:fc18c589e71754b704a88d"
           }
         }
       }

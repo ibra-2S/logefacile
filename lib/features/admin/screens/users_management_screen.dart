@@ -86,11 +86,13 @@ class _UsersManagementScreenState extends ConsumerState<UsersManagementScreen>
                 utilisateurs: proprietaires,
                 firestoreService: firestoreService,
                 messageVide: 'Aucun propriétaire',
+                groupeValidation: true,
               ),
               _ListeUtilisateurs(
                 utilisateurs: agents,
                 firestoreService: firestoreService,
                 messageVide: 'Aucun agent',
+                groupeValidation: true,
               ),
               _ListeUtilisateurs(
                 utilisateurs: admins,
@@ -110,10 +112,15 @@ class _ListeUtilisateurs extends StatelessWidget {
   final FirestoreService firestoreService;
   final String messageVide;
 
+  /// true pour les propriétaires / agents : la liste est scindée en
+  /// « En attente de validation » et « Comptes validés ».
+  final bool groupeValidation;
+
   const _ListeUtilisateurs({
     required this.utilisateurs,
     required this.firestoreService,
     required this.messageVide,
+    this.groupeValidation = false,
   });
 
   @override
@@ -127,16 +134,83 @@ class _ListeUtilisateurs extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: utilisateurs.length,
-      itemBuilder: (context, index) {
-        final user = utilisateurs[index];
-        return _CarteUtilisateur(
-          user: user,
-          firestoreService: firestoreService,
-        );
-      },
+    if (!groupeValidation) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: utilisateurs.length,
+        itemBuilder: (context, index) {
+          final user = utilisateurs[index];
+          return _CarteUtilisateur(
+            user: user,
+            firestoreService: firestoreService,
+          );
+        },
+      );
+    }
+
+    final nonValides = utilisateurs.where((u) => !u.estVerifie).toList();
+    final valides = utilisateurs.where((u) => u.estVerifie).toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      children: [
+        if (nonValides.isNotEmpty) ...[
+          _entete(
+            'En attente de validation',
+            nonValides.length,
+            AppColors.avertissement,
+            Icons.hourglass_top_rounded,
+          ),
+          const SizedBox(height: 12),
+          for (final u in nonValides)
+            _CarteUtilisateur(user: u, firestoreService: firestoreService),
+          const SizedBox(height: 12),
+        ],
+        if (valides.isNotEmpty) ...[
+          _entete(
+            'Comptes validés',
+            valides.length,
+            AppColors.succes,
+            Icons.verified_outlined,
+          ),
+          const SizedBox(height: 12),
+          for (final u in valides)
+            _CarteUtilisateur(user: u, firestoreService: firestoreService),
+        ],
+      ],
+    );
+  }
+
+  Widget _entete(String titre, int nombre, Color couleur, IconData icone) {
+    return Row(
+      children: [
+        Icon(icone, size: 18, color: couleur),
+        const SizedBox(width: 8),
+        Text(
+          titre,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.texte,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: couleur.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            '$nombre',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: couleur,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
