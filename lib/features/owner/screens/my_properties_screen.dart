@@ -16,10 +16,27 @@ import '../../../features/auth/providers/auth_provider.dart';
 class MyPropertiesScreen extends ConsumerWidget {
   const MyPropertiesScreen({super.key});
 
+  void _ouvrirAjout(BuildContext context, {required bool enAttente}) {
+    if (enAttente) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Votre compte doit être validé par un administrateur avant de '
+            'publier un bien.',
+          ),
+          backgroundColor: AppColors.avertissement,
+        ),
+      );
+      return;
+    }
+    context.push(AppRoutes.ajouterBien);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final utilisateur = ref.watch(utilisateurActuelProvider).asData?.value;
     final firestoreService = FirestoreService();
+    final enAttente = utilisateur?.compteEnAttenteValidation ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.fond,
@@ -33,7 +50,7 @@ class MyPropertiesScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add, color: Colors.white),
-            onPressed: () => context.push(AppRoutes.ajouterBien),
+            onPressed: () => _ouvrirAjout(context, enAttente: enAttente),
           ),
         ],
       ),
@@ -67,7 +84,10 @@ class MyPropertiesScreen extends ConsumerWidget {
                               couleur: AppColors.vertProprietaire,
                               action: ElevatedButton.icon(
                                 onPressed:
-                                    () => context.push(AppRoutes.ajouterBien),
+                                    () => _ouvrirAjout(
+                                      context,
+                                      enAttente: enAttente,
+                                    ),
                                 icon: const Icon(
                                   Icons.add,
                                   color: Colors.white,
@@ -115,8 +135,9 @@ class MyPropertiesScreen extends ConsumerWidget {
                 },
               ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push(AppRoutes.ajouterBien),
-        backgroundColor: AppColors.vertProprietaire,
+        onPressed: () => _ouvrirAjout(context, enAttente: enAttente),
+        backgroundColor:
+            enAttente ? AppColors.grisMoyen : AppColors.vertProprietaire,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );

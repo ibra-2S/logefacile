@@ -26,7 +26,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   final _titreCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _adresseCtrl = TextEditingController();
-  final _villeCtrl = TextEditingController();
+  final _villeCtrl = TextEditingController(text: 'Conakry');
   final _quartierCtrl = TextEditingController();
   final _prixCtrl = TextEditingController();
   final _surfaceCtrl = TextEditingController();
@@ -58,6 +58,51 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
 
   static const String _cloudName = 'dfxnwioow';
   static const String _uploadPreset = 'g1qqzyep';
+
+  // Bornes géographiques approximatives du Grand Conakry.
+  // La localisation GPS n'est acceptée que si l'utilisateur se trouve dedans.
+  static const double _conakryLatMin = 9.45;
+  static const double _conakryLatMax = 9.85;
+  static const double _conakryLngMin = -13.85;
+  static const double _conakryLngMax = -13.45;
+
+  bool _dansConakry(double lat, double lng) =>
+      lat >= _conakryLatMin &&
+      lat <= _conakryLatMax &&
+      lng >= _conakryLngMin &&
+      lng <= _conakryLngMax;
+
+  bool get _pieceUnique =>
+      _typeSelectionne == TypeBien.chambre ||
+      _typeSelectionne == TypeBien.studio;
+
+  // Nombre de pièces / chambres imposés selon le type de bien.
+  int? get _nombrePiecesAuto => switch (_typeSelectionne) {
+    TypeBien.chambre || TypeBien.studio => 1,
+    _ => int.tryParse(_piecesCtrl.text.trim()),
+  };
+
+  int? get _nombreChambresAuto => switch (_typeSelectionne) {
+    TypeBien.chambre => 1,
+    TypeBien.studio => 0,
+    _ => int.tryParse(_chambresCtrl.text.trim()),
+  };
+
+  void _selectionnerType(TypeBien type) {
+    setState(() {
+      _typeSelectionne = type;
+      // On efface les champs qui deviennent masqués pour ce type
+      // afin de ne pas publier de valeurs incohérentes.
+      if (type == TypeBien.chambre) {
+        _piecesCtrl.clear();
+        _chambresCtrl.clear();
+        _cuisinesCtrl.clear();
+      } else if (type == TypeBien.studio) {
+        _piecesCtrl.clear();
+        _chambresCtrl.clear();
+      }
+    });
+  }
 
   final _firestoreService = FirestoreService();
   final _imagePicker = ImagePicker();
@@ -142,6 +187,22 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
         ),
       );
 
+      if (!_dansConakry(position.latitude, position.longitude)) {
+        setState(() => _localisationEnCours = false);
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Votre position actuelle est hors de Conakry. '
+                'La localisation GPS ne peut être enregistrée que depuis Conakry.',
+              ),
+              backgroundColor: AppColors.erreur,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        return;
+      }
+
       setState(() {
         _localisation = GeoPoint(position.latitude, position.longitude);
         _localisationEnCours = false;
@@ -216,6 +277,17 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   }
 
   Future<void> _publierBien() async {
+    final u = ref.read(utilisateurActuelProvider).asData?.value;
+    if (u != null && u.compteEnAttenteValidation) {
+      setState(
+        () =>
+            _erreur =
+                'Votre compte doit être validé par un administrateur avant '
+                'de pouvoir publier un bien.',
+      );
+      return;
+    }
+
     if (_titreCtrl.text.trim().isEmpty ||
         _adresseCtrl.text.trim().isEmpty ||
         _villeCtrl.text.trim().isEmpty ||
@@ -255,10 +327,13 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
         statut: StatutBien.disponible,
         prix: double.tryParse(_prixCtrl.text.trim()) ?? 0,
         surface: double.tryParse(_surfaceCtrl.text.trim()),
-        nombrePieces: int.tryParse(_piecesCtrl.text.trim()),
-        nombreChambres: int.tryParse(_chambresCtrl.text.trim()),
+        nombrePieces: _nombrePiecesAuto,
+        nombreChambres: _nombreChambresAuto,
         nombreToilettes: int.tryParse(_toilettesCtrl.text.trim()),
-        nombreCuisines: int.tryParse(_cuisinesCtrl.text.trim()),
+        nombreCuisines:
+            _typeSelectionne == TypeBien.chambre
+                ? null
+                : int.tryParse(_cuisinesCtrl.text.trim()),
         adresse: _adresseCtrl.text.trim(),
         ville: _villeCtrl.text.trim(),
         quartier:
@@ -299,6 +374,10 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   Widget build(BuildContext context) {
     final utilisateur = ref.watch(utilisateurActuelProvider).asData?.value;
     final estAgent = utilisateur?.role == UserRole.agent;
+
+    if (utilisateur != null && utilisateur.compteEnAttenteValidation) {
+      return _ecranEnAttenteValidation(context);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.fond,
@@ -375,7 +454,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                         TypeBien.studio: '🪟 Studio',
                       };
                       return GestureDetector(
-                        onTap: () => setState(() => _typeSelectionne = type),
+                        onTap: () => _selectionnerType(type),
                         child: Container(
                           margin: const EdgeInsets.only(right: 8),
                           padding: const EdgeInsets.symmetric(
@@ -561,7 +640,17 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             // ── LOCALISATION ──
             _titreSectionn('Localisation'),
             const SizedBox(height: 10),
-            _champTexte('Ville *', 'Ex: Conakry', _villeCtrl),
+            _champTexte(
+              'Ville',
+              'Conakry',
+              _villeCtrl,
+              actif: false,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'LogeFacile est disponible uniquement à Conakry.',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondaire),
+            ),
             const SizedBox(height: 12),
             _champTexte(
               'Adresse complète *',
@@ -676,43 +765,23 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            _champTexte(
-              'Nombre de pièces',
-              'Ex: 3',
-              _piecesCtrl,
-              type: TextInputType.number,
-            ),
+            if (_pieceUnique)
+              _infoFixe(
+                'Nombre de pièces',
+                '1 pièce',
+                _typeSelectionne == TypeBien.chambre
+                    ? 'Une chambre en location correspond à une seule pièce.'
+                    : 'Un studio est un espace unique : séjour, coin nuit et cuisine réunis.',
+              )
+            else
+              _champTexte(
+                'Nombre de pièces',
+                'Ex: 3',
+                _piecesCtrl,
+                type: TextInputType.number,
+              ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _champTexte(
-                    '🛏️ Chambres',
-                    'Ex: 2',
-                    _chambresCtrl,
-                    type: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _champTexte(
-                    '🚿 Toilettes',
-                    'Ex: 1',
-                    _toilettesCtrl,
-                    type: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _champTexte(
-                    '🍳 Cuisines',
-                    'Ex: 1',
-                    _cuisinesCtrl,
-                    type: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
+            _ligneDetails(),
             const SizedBox(height: 20),
 
             // ── CONDITIONS FINANCIÈRES ──
@@ -934,6 +1003,106 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     );
   }
 
+  Widget _ecranEnAttenteValidation(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.fond,
+      appBar: AppBar(
+        backgroundColor: AppColors.bleuFonce,
+        elevation: 0,
+        title: const Text(
+          'Publier un bien',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.avertissement.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.hourglass_top_rounded,
+                  size: 44,
+                  color: AppColors.avertissement,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Compte en attente de validation',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.texte,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Un administrateur doit valider votre compte avant que vous '
+                'puissiez publier un bien. Vous recevrez l\'accès dès que '
+                'la vérification sera terminée.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: AppColors.textSecondaire,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    ref.invalidate(utilisateurActuelProvider);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Statut du compte actualisé.')),
+                    );
+                  },
+                  icon: const Icon(Icons.refresh, color: Colors.white, size: 18),
+                  label: const Text(
+                    'Vérifier mon statut',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.bleuFonce,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => context.pop(),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.bleuFonce),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Retour',
+                    style: TextStyle(color: AppColors.bleuFonce),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _carteCondition({
     required String titre,
     required String description,
@@ -1007,6 +1176,99 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     );
   }
 
+  // Ligne Chambres / Toilettes / Cuisines adaptée au type de bien.
+  Widget _ligneDetails() {
+    final champs = <Widget>[];
+    if (_typeSelectionne == TypeBien.maison ||
+        _typeSelectionne == TypeBien.appartement) {
+      champs.add(
+        _champTexte(
+          '🛏️ Chambres',
+          'Ex: 2',
+          _chambresCtrl,
+          type: TextInputType.number,
+        ),
+      );
+    }
+    champs.add(
+      _champTexte(
+        '🚿 Toilettes',
+        'Ex: 1',
+        _toilettesCtrl,
+        type: TextInputType.number,
+      ),
+    );
+    if (_typeSelectionne != TypeBien.chambre) {
+      champs.add(
+        _champTexte(
+          '🍳 Cuisines',
+          _typeSelectionne == TypeBien.studio ? 'Ex: 1 (kitchenette)' : 'Ex: 1',
+          _cuisinesCtrl,
+          type: TextInputType.number,
+        ),
+      );
+    }
+
+    final enfants = <Widget>[];
+    for (var i = 0; i < champs.length; i++) {
+      enfants.add(Expanded(child: champs[i]));
+      if (i < champs.length - 1) enfants.add(const SizedBox(width: 12));
+    }
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: enfants);
+  }
+
+  Widget _infoFixe(String label, String valeur, String note) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            color: AppColors.texte,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEDEEF1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.grisClair),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.lock_outline,
+                size: 18,
+                color: AppColors.textSecondaire,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                valeur,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondaire,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          note,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.textSecondaire,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _titreSectionn(String titre) {
     return Text(
       titre,
@@ -1024,6 +1286,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     TextEditingController ctrl, {
     int lignes = 1,
     TextInputType type = TextInputType.text,
+    bool actif = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1041,19 +1304,36 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
           controller: ctrl,
           maxLines: lignes,
           keyboardType: type,
+          enabled: actif,
+          style: TextStyle(
+            fontSize: 14,
+            color: actif ? AppColors.texte : AppColors.textSecondaire,
+          ),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(
               color: AppColors.texteLeger,
               fontSize: 13,
             ),
+            suffixIcon:
+                actif
+                    ? null
+                    : const Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: AppColors.textSecondaire,
+                    ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: actif ? Colors.white : const Color(0xFFEDEEF1),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.grisClair),
             ),
             enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.grisClair),
+            ),
+            disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.grisClair),
             ),

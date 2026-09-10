@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,6 +8,36 @@ import '../../../core/models/user_model.dart';
 import '../providers/auth_provider.dart';
 
 const _bleuFonce = Color(0xFF1A237E);
+
+/// Pays / indicatif proposés pour le numéro de téléphone.
+class _Pays {
+  final String nom;
+  final String drapeau;
+  final String indicatif; // sans le « + »
+  final int longueurMin;
+  final int longueurMax;
+
+  const _Pays(
+    this.nom,
+    this.drapeau,
+    this.indicatif,
+    this.longueurMin, [
+    int? longueurMax,
+  ]) : longueurMax = longueurMax ?? longueurMin;
+}
+
+const _paysListe = <_Pays>[
+  _Pays('Guinée', '🇬🇳', '224', 9),
+  _Pays('Sénégal', '🇸🇳', '221', 9),
+  _Pays('Mali', '🇲🇱', '223', 8),
+  _Pays("Côte d'Ivoire", '🇨🇮', '225', 10),
+  _Pays('Guinée-Bissau', '🇬🇼', '245', 7, 9),
+  _Pays('Sierra Leone', '🇸🇱', '232', 8, 9),
+  _Pays('Liberia', '🇱🇷', '231', 7, 9),
+  _Pays('Gambie', '🇬🇲', '220', 7),
+  _Pays('Mauritanie', '🇲🇷', '222', 8),
+  _Pays('France', '🇫🇷', '33', 9),
+];
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -27,6 +58,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _erreur;
   int _etape = 0;
   late UserRole _role;
+  _Pays _paysSel = _paysListe.first;
 
   static const _titresEtapes = ['Identité', 'Connexion', 'Confirmation'];
 
@@ -50,6 +82,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _validerEtape(int etape) {
     if (etape == 0) {
       if (_nomCtrl.text.trim().isEmpty) return 'Indiquez votre nom complet.';
+      final errTel = _validerTelephone();
+      if (errTel != null) return errTel;
     }
     if (etape == 1) {
       final email = _emailCtrl.text.trim();
@@ -65,6 +99,129 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     }
     return null;
+  }
+
+  /// Retire espaces / séparateurs et l'éventuel indicatif (« + », « 00 » ou
+  /// l'indicatif du pays sélectionné) d'une saisie, en renvoyant à la fois
+  /// l'indicatif détecté dans le champ (ou `null`) et le numéro national.
+  ({String? indicatifSaisi, String national}) _decouperNumero(String brut) {
+    var s = brut.replaceAll(RegExp(r'[\s.\-()/]'), '');
+    String? indic;
+
+    if (s.startsWith('+') || s.startsWith('00')) {
+      s = s.startsWith('+') ? s.substring(1) : s.substring(2);
+      indic = _indicatifConnu(s);
+      if (indic != null) s = s.substring(indic.length);
+    } else if (s.startsWith(_paysSel.indicatif) &&
+        s.length > _paysSel.longueurMax) {
+      // ex : « 224620000000 » saisi sans + ni 00
+      indic = _paysSel.indicatif;
+      s = s.substring(indic.length);
+    }
+
+    if (s.startsWith('0')) s = s.substring(1); // 0 national
+    return (indicatifSaisi: indic, national: s);
+  }
+
+  /// Cherche, parmi les indicatifs connus, le plus long qui préfixe [digits].
+  String? _indicatifConnu(String digits) {
+    final trouves =
+        _paysListe.map((p) => p.indicatif).where(digits.startsWith).toList()
+          ..sort((a, b) => b.length.compareTo(a.length));
+    return trouves.isEmpty ? null : trouves.first;
+  }
+
+  /// Valide le numéro par rapport à l'indicatif choisi. `null` = OK
+  /// (le téléphone reste optionnel).
+  String? _validerTelephone() {
+    final brut = _telCtrl.text.trim();
+    if (brut.isEmpty) return null;
+
+    if (brut.startsWith('+') && _indicatifConnu(brut.substring(1)) == null) {
+      return "Indicatif non reconnu. Choisissez le pays dans la liste et "
+          "saisissez le numéro sans indicatif.";
+    }
+
+    final d = _decouperNumero(brut);
+    if (d.indicatifSaisi != null && d.indicatifSaisi != _paysSel.indicatif) {
+      return "L'indicatif du numéro (+${d.indicatifSaisi}) ne correspond pas "
+          "au pays sélectionné (${_paysSel.drapeau} +${_paysSel.indicatif}).";
+    }
+
+    if (!RegExp(r'^\d+$').hasMatch(d.national)) {
+      return 'Le numéro ne doit contenir que des chiffres.';
+    }
+
+    final n = d.national.length;
+    if (n < _paysSel.longueurMin || n > _paysSel.longueurMax) {
+      return 'Numéro invalide pour ${_paysSel.nom} : '
+          '${_formatLongueur()} attendus (sans l\'indicatif).';
+    }
+    return null;
+  }
+
+  /// Numéro au format international « +224620000000 », ou `null` si vide.
+  String? _telephoneComplet() {
+    if (_telCtrl.text.trim().isEmpty) return null;
+    final d = _decouperNumero(_telCtrl.text.trim());
+    return '+${_paysSel.indicatif}${d.national}';
+  }
+
+  String _formatLongueur() =>
+      _paysSel.longueurMin == _paysSel.longueurMax
+          ? '${_paysSel.longueurMin} chiffres'
+          : '${_paysSel.longueurMin} à ${_paysSel.longueurMax} chiffres';
+
+  Future<void> _choisirPays() async {
+    final choix = await showModalBottomSheet<_Pays>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 14),
+                const Text(
+                  'Indicatif du pays',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+                const SizedBox(height: 6),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children:
+                        _paysListe
+                            .map(
+                              (p) => ListTile(
+                                leading: Text(
+                                  p.drapeau,
+                                  style: const TextStyle(fontSize: 22),
+                                ),
+                                title: Text(p.nom),
+                                trailing: Text(
+                                  '+${p.indicatif}',
+                                  style: const TextStyle(color: Colors.black54),
+                                ),
+                                selected: p.indicatif == _paysSel.indicatif,
+                                onTap: () => Navigator.pop(ctx, p),
+                              ),
+                            )
+                            .toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+    if (choix != null) {
+      setState(() {
+        _paysSel = choix;
+        _erreur = _validerTelephone();
+      });
+    }
   }
 
   void _suivant() {
@@ -104,8 +261,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             motDePasse: _mdpCtrl.text.trim(),
             nomComplet: _nomCtrl.text.trim(),
             role: _role,
-            telephone:
-                _telCtrl.text.trim().isEmpty ? null : _telCtrl.text.trim(),
+            telephone: _telephoneComplet(),
           );
 
       if (!mounted) return;
@@ -398,11 +554,63 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             const SizedBox(height: 18),
             _champ('Nom complet *', 'Votre nom et prénom', _nomCtrl),
             const SizedBox(height: 14),
-            _champ(
+            const Text(
               'Téléphone',
-              'Numéro (optionnel)',
-              _telCtrl,
-              type: TextInputType.phone,
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: _choisirPays,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 15,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _paysSel.drapeau,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '+${_paysSel.indicatif}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _telCtrl,
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9 +]')),
+                    ],
+                    decoration: _deco('Numéro (optionnel)'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${_paysSel.nom} · ${_formatLongueur()} attendus, sans l\'indicatif',
+              style: const TextStyle(fontSize: 11, color: Colors.black45),
             ),
           ],
         );
@@ -478,7 +686,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               'Téléphone',
               _telCtrl.text.trim().isEmpty
                   ? 'Non renseigné'
-                  : _telCtrl.text.trim(),
+                  : '${_paysSel.drapeau} ${_telephoneComplet()}',
             ),
             const SizedBox(height: 12),
             Container(

@@ -95,6 +95,10 @@ class OwnerDashboard extends ConsumerWidget {
                                 _carteBonjour(
                                   utilisateur.nomComplet.split(' ').first,
                                 ),
+                                if (utilisateur.compteEnAttenteValidation) ...[
+                                  const SizedBox(height: 16),
+                                  _bandeauValidation(),
+                                ],
                                 const SizedBox(height: 24),
                                 const Text(
                                   'Vue d\'ensemble',
@@ -235,10 +239,28 @@ class OwnerDashboard extends ConsumerWidget {
                                   emoji: '➕',
                                   titre: 'Publier un bien',
                                   description:
-                                      'Ajouter un nouveau logement à louer',
+                                      utilisateur.compteEnAttenteValidation
+                                          ? 'Disponible après validation de '
+                                              'votre compte'
+                                          : 'Ajouter un nouveau logement à louer',
                                   couleur: AppColors.vertProprietaire,
-                                  onTap:
-                                      () => context.push(AppRoutes.ajouterBien),
+                                  onTap: () {
+                                    if (utilisateur.compteEnAttenteValidation) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Votre compte doit être validé par '
+                                            'un administrateur avant de publier '
+                                            'un bien.',
+                                          ),
+                                          backgroundColor:
+                                              AppColors.avertissement,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    context.push(AppRoutes.ajouterBien);
+                                  },
                                 ),
                                 const SizedBox(height: 10),
                                 _carteAction(
@@ -315,6 +337,55 @@ class OwnerDashboard extends ConsumerWidget {
           const Text(
             'Gérez vos biens immobiliers',
             style: TextStyle(fontSize: 14, color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bandeauValidation() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.avertissement.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.avertissement.withValues(alpha: 0.4),
+        ),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.hourglass_top_rounded,
+            color: AppColors.avertissement,
+            size: 20,
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Compte en attente de validation',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.texte,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Un administrateur doit valider votre compte avant que '
+                  'vous puissiez publier un bien.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondaire,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -207,8 +207,30 @@ class _CarteUtilisateur extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (user.compteEnAttenteValidation)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.avertissement.withValues(
+                              alpha: 0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'À valider',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.avertissement,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       if (!user.estActif)
                         Container(
+                          margin: const EdgeInsets.only(left: 4),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 2,
@@ -263,6 +285,21 @@ class _CarteUtilisateur extends StatelessWidget {
                     user.uid,
                     true,
                   );
+                } else if (valeur == 'valider') {
+                  await firestoreService.definirValidationCompte(user.uid, true);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Compte validé : le bailleur peut publier.'),
+                        backgroundColor: AppColors.succes,
+                      ),
+                    );
+                  }
+                } else if (valeur == 'invalider') {
+                  await firestoreService.definirValidationCompte(
+                    user.uid,
+                    false,
+                  );
                 } else if (valeur == 'supprimer') {
                   final confirme = await showDialog<bool>(
                     context: context,
@@ -295,6 +332,29 @@ class _CarteUtilisateur extends StatelessWidget {
               },
               itemBuilder:
                   (context) => [
+                    if (user.estProprietaireOuAgent && !user.estVerifie)
+                      const PopupMenuItem(
+                        value: 'valider',
+                        child: Row(
+                          children: [
+                            Icon(Icons.verified_outlined, color: AppColors.succes),
+                            SizedBox(width: 8),
+                            Text('Valider le compte'),
+                          ],
+                        ),
+                      ),
+                    if (user.estProprietaireOuAgent && user.estVerifie)
+                      const PopupMenuItem(
+                        value: 'invalider',
+                        child: Row(
+                          children: [
+                            Icon(Icons.gpp_bad_outlined,
+                                color: AppColors.avertissement),
+                            SizedBox(width: 8),
+                            Text('Retirer la validation'),
+                          ],
+                        ),
+                      ),
                     if (user.estActif)
                       const PopupMenuItem(
                         value: 'suspendre',
@@ -472,8 +532,10 @@ class _FicheUtilisateur extends StatelessWidget {
                         runSpacing: 4,
                         children: [
                           _puce(_libelleRole(user.role), couleur),
-                          if (user.estVerifie)
-                            _puce('Vérifié', AppColors.succes),
+                          if (estProAgent && user.estVerifie)
+                            _puce('Compte validé', AppColors.succes)
+                          else if (estProAgent)
+                            _puce('À valider', AppColors.avertissement),
                           _puce(
                             user.estActif ? 'Actif' : 'Suspendu',
                             user.estActif ? AppColors.succes : AppColors.erreur,
@@ -512,6 +574,82 @@ class _FicheUtilisateur extends StatelessWidget {
 
             // spécifique propriétaire / agent
             if (estProAgent) ...[
+              const SizedBox(height: 16),
+              _section('Validation du compte'),
+              Text(
+                user.estVerifie
+                    ? 'Ce compte est validé : le bailleur peut publier des '
+                        'annonces.'
+                    : 'Tant que le compte n\'est pas validé, ce bailleur ne '
+                        'peut pas publier d\'annonce.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: AppColors.textSecondaire,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child:
+                    user.estVerifie
+                        ? OutlinedButton.icon(
+                          onPressed: () async {
+                            await firestoreService.definirValidationCompte(
+                              user.uid,
+                              false,
+                            );
+                            if (context.mounted) Navigator.pop(context);
+                          },
+                          icon: const Icon(
+                            Icons.gpp_bad_outlined,
+                            size: 18,
+                            color: AppColors.avertissement,
+                          ),
+                          label: const Text(
+                            'Retirer la validation',
+                            style: TextStyle(color: AppColors.avertissement),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: AppColors.avertissement,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        )
+                        : ElevatedButton.icon(
+                          onPressed: () async {
+                            await firestoreService.definirValidationCompte(
+                              user.uid,
+                              true,
+                            );
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Compte validé : le bailleur peut publier.',
+                                  ),
+                                  backgroundColor: AppColors.succes,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.verified_outlined,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                          label: const Text(
+                            'Valider le compte',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.succes,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+              ),
               const SizedBox(height: 16),
               _section(
                 user.role == UserRole.agent ? 'Agence & biens' : 'Biens',

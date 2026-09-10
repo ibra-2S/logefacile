@@ -283,16 +283,25 @@ class FirestoreService {
     String? photoLocataire,
     String? photoProprietaire,
   }) async {
+    // une seule conversation par couple locataire/propriétaire, quel que
+    // soit le bien : on ne filtre plus par bienId
     final snapshot =
         await _db
             .collection('conversations')
             .where('participants', arrayContains: locataireId)
-            .where('bienId', isEqualTo: bienId)
             .get();
 
     for (final doc in snapshot.docs) {
       final participants = List<String>.from(doc.data()['participants']);
-      if (participants.contains(proprietaireId)) return doc.id;
+      if (participants.contains(proprietaireId)) {
+        // le fil existant reprend, mais on rafraîchit le bien affiché
+        // avec celui qui vient d'être contacté
+        await _db.collection('conversations').doc(doc.id).update({
+          'bienId': bienId,
+          'titreBien': titreBien,
+        });
+        return doc.id;
+      }
     }
 
     // créer une nouvelle conversation avec les noms
@@ -486,6 +495,12 @@ class FirestoreService {
   // modifier le statut d'un utilisateur
   Future<void> modifierStatutUtilisateur(String uid, bool estActif) async {
     await _db.collection('users').doc(uid).update({'estActif': estActif});
+  }
+
+  // valider (ou retirer la validation) le compte d'un propriétaire / agent :
+  // conditionne le droit de publier une annonce
+  Future<void> definirValidationCompte(String uid, bool valide) async {
+    await _db.collection('users').doc(uid).update({'estVerifie': valide});
   }
 
   // supprimer un utilisateur

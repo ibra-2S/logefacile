@@ -1,19 +1,28 @@
 rules_version = '2';
 
 // Exemple de règles à adapter/fusionner dans la console Firebase.
-// (à copier dans Firestore Database → Règles)
+// (à copier dans Firestore Database → Règles, puis « Publier »)
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function connecte() { return request.auth != null; }
     function estMoi(uid) { return request.auth.uid == uid; }
 
+    // true si l'utilisateur connecté a le rôle "admin" dans son propre document
+    function estAdmin() {
+      return connecte()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // Utilisateurs : chacun lit/écrit son propre document.
     // (les champs notificationsActives, fcmTokens, photoUrl… passent par là)
+    // Un admin peut aussi modifier / supprimer les autres comptes
+    // (validation estVerifie, suspension estActif, suppression).
     match /users/{uid} {
       allow read: if connecte();
-      allow create, update: if estMoi(uid);
-      allow delete: if estMoi(uid);
+      allow create: if estMoi(uid);
+      allow update: if estMoi(uid) || estAdmin();
+      allow delete: if estMoi(uid) || estAdmin();
     }
 
     // Biens : lecture publique aux connectés, écriture par le propriétaire.
@@ -25,12 +34,14 @@ service cloud.firestore {
         && request.resource.data.proprietaireId == request.auth.uid;
       allow update: if connecte() && (
         resource.data.proprietaireId == request.auth.uid
+        || estAdmin()
         || request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['nombreVues', 'statsVues', 'nombreFavoris',
                        'noteMoyenne', 'nombreAvis'])
       );
-      allow delete: if connecte()
-        && resource.data.proprietaireId == request.auth.uid;
+      allow delete: if connecte() && (
+        resource.data.proprietaireId == request.auth.uid || estAdmin()
+      );
     }
 
     // Favoris

@@ -110,4 +110,11 @@ class UserModel {
       role == UserRole.proprietaire || role == UserRole.agent;
   bool get estLocataire => role == UserRole.locataire;
   bool get estAdmin => role == UserRole.admin;
+
+  /// Un propriétaire / agent doit être validé par un admin (`estVerifie`)
+  /// avant de pouvoir publier un bien.
+  bool get compteEnAttenteValidation => estProprietaireOuAgent && !estVerifie;
+
+  /// true si l'utilisateur a le droit de publier une annonce.
+  bool get peutPublierBien => !estProprietaireOuAgent || estVerifie;
 }
