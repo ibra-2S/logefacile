@@ -5,6 +5,9 @@ android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 android/app/src/**/google-services.json
 
+# Documents de mémoire / PFE (personnels, hors code)
+*.pdf
+
 # Miscellaneous
 *.class
 *.log
