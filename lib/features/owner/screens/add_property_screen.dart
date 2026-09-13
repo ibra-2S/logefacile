@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,13 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/equipements.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/models/user_model.dart';
+import '../../../core/services/cloudinary_service.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/commune_dropdown.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class AddPropertyScreen extends ConsumerStatefulWidget {
@@ -38,6 +39,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   final _fraisAgenceCtrl = TextEditingController();
 
   TypeBien _typeSelectionne = TypeBien.maison;
+  String? _communeSelectionnee;
   bool _chargement = false;
   String? _erreur;
 
@@ -55,9 +57,6 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   // photos
   final List<File> _photosSelectionnees = [];
   bool _uploadEnCours = false;
-
-  static const String _cloudName = 'dfxnwioow';
-  static const String _uploadPreset = 'g1qqzyep';
 
   // Bornes géographiques approximatives du Grand Conakry.
   // La localisation GPS n'est acceptée que si l'utilisateur se trouve dedans.
@@ -107,14 +106,6 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   final _firestoreService = FirestoreService();
   final _imagePicker = ImagePicker();
 
-  final List<String> _equipements = [
-    'wifi',
-    'parking',
-    'eau',
-    'électricité',
-    'climatisation',
-    'gardien',
-  ];
   final List<String> _equipementsSelectionnes = [];
 
   @override
@@ -253,25 +244,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       setState(() => _photosSelectionnees.removeAt(index));
 
   Future<List<String>> _uploaderPhotos() async {
-    final urls = <String>[];
     setState(() => _uploadEnCours = true);
-    for (final photo in _photosSelectionnees) {
-      try {
-        final request = http.MultipartRequest(
-          'POST',
-          Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload'),
-        );
-        request.fields['upload_preset'] = _uploadPreset;
-        request.files.add(
-          await http.MultipartFile.fromPath('file', photo.path),
-        );
-        final response = await request.send();
-        final responseData = await response.stream.bytesToString();
-        final jsonData = jsonDecode(responseData);
-        if (response.statusCode == 200)
-          urls.add(jsonData['secure_url'] as String);
-      } catch (e) {}
-    }
+    final urls = await CloudinaryService.uploaderImages(_photosSelectionnees);
     setState(() => _uploadEnCours = false);
     return urls;
   }
@@ -291,6 +265,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     if (_titreCtrl.text.trim().isEmpty ||
         _adresseCtrl.text.trim().isEmpty ||
         _villeCtrl.text.trim().isEmpty ||
+        _communeSelectionnee == null ||
         _prixCtrl.text.trim().isEmpty) {
       setState(
         () => _erreur = 'Veuillez remplir tous les champs obligatoires.',
@@ -311,6 +286,20 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
 
       List<String> photosUrls = [];
       if (_photosSelectionnees.isNotEmpty) photosUrls = await _uploaderPhotos();
+
+      final echecsUpload = _photosSelectionnees.length - photosUrls.length;
+      if (echecsUpload > 0) {
+        messager.showSnackBar(
+          SnackBar(
+            content: Text(
+              echecsUpload == 1
+                  ? "1 photo n'a pas pu être envoyée et sera absente de l'annonce."
+                  : '$echecsUpload photos n\'ont pas pu être envoyées et seront absentes de l\'annonce.',
+            ),
+            backgroundColor: AppColors.avertissement,
+          ),
+        );
+      }
 
       final bien = PropertyModel(
         id: '',
@@ -336,6 +325,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                 : int.tryParse(_cuisinesCtrl.text.trim()),
         adresse: _adresseCtrl.text.trim(),
         ville: _villeCtrl.text.trim(),
+        commune: _communeSelectionnee,
         quartier:
             _quartierCtrl.text.trim().isEmpty
                 ? null
@@ -652,13 +642,23 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               style: TextStyle(fontSize: 11, color: AppColors.textSecondaire),
             ),
             const SizedBox(height: 12),
-            _champTexte(
-              'Adresse complète *',
-              'Ex: Rue KA-045, Kaloum',
-              _adresseCtrl,
+            CommuneDropdown(
+              valeur: _communeSelectionnee,
+              onChanged: (v) => setState(() => _communeSelectionnee = v),
+              border: Border.all(color: AppColors.grisClair),
             ),
             const SizedBox(height: 12),
-            _champTexte('Quartier', 'Ex: Kaloum, Dixinn...', _quartierCtrl),
+            _champTexte(
+              'Quartier',
+              'Ex: Almamya, Bonfi...',
+              _quartierCtrl,
+            ),
+            const SizedBox(height: 12),
+            _champTexte(
+              'Adresse complète *',
+              'Ex: Rue KA-045',
+              _adresseCtrl,
+            ),
             const SizedBox(height: 12),
             GestureDetector(
               onTap: _localisationEnCours ? null : _obtenirLocalisation,
@@ -914,7 +914,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               spacing: 8,
               runSpacing: 8,
               children:
-                  _equipements.map((eq) {
+                  equipementsDisponibles.map((eq) {
                     final estCoche = _equipementsSelectionnes.contains(eq);
                     return GestureDetector(
                       onTap:
@@ -1279,6 +1279,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       ),
     );
   }
+
 
   Widget _champTexte(
     String label,

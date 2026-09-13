@@ -198,7 +198,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: 24),
                   const Center(
                     child: Text(
-                      'LogeFacile · version 1.0.0',
+                      'LogeFacile · version 1.4.7',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.texteLeger,

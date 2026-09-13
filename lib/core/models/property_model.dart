@@ -21,6 +21,7 @@ class PropertyModel {
   final int? nombreCuisines;
   final String adresse;
   final String ville;
+  final String? commune;
   final String? quartier;
   final GeoPoint localisation;
   final List<String> photos;
@@ -55,6 +56,7 @@ class PropertyModel {
     this.nombreCuisines,
     required this.adresse,
     required this.ville,
+    this.commune,
     this.quartier,
     required this.localisation,
     this.photos = const [],
@@ -118,6 +120,7 @@ class PropertyModel {
       nombreCuisines: d['nombreCuisines'],
       adresse: d['adresse'] ?? '',
       ville: d['ville'] ?? '',
+      commune: d['commune'],
       quartier: d['quartier'],
       localisation: _lireGeoPoint(d['localisation']),
       photos: List<String>.from(d['photos'] ?? []),
@@ -158,6 +161,7 @@ class PropertyModel {
       'nombreCuisines': nombreCuisines,
       'adresse': adresse,
       'ville': ville,
+      'commune': commune,
       'quartier': quartier,
       'localisation': localisation,
       'photos': photos,
@@ -174,5 +178,16 @@ class PropertyModel {
       'datePublication': Timestamp.fromDate(datePublication),
       'dateMiseAJour': Timestamp.fromDate(dateMiseAJour),
     };
+  }
+
+  /// texte de localisation court et cohérent, utilisé partout dans l'app
+  /// (fil d'annonces, favoris, mes biens, fiche détaillée) : "Quartier,
+  /// Commune — Ville", en s'adaptant aux champs manquants.
+  String get localisationCourte {
+    final details = [
+      quartier,
+      commune,
+    ].where((p) => p != null && p.isNotEmpty).join(', ');
+    return details.isEmpty ? ville : '$details — $ville';
   }
 }

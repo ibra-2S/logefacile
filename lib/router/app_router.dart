@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_routes.dart';
+import '../core/models/user_model.dart';
 import '../features/admin/screens/admin_properties_screen.dart';
 import '../features/admin/screens/admin_shell.dart';
 import '../features/admin/screens/admin_stats_screen.dart';
@@ -14,6 +15,7 @@ import '../features/auth/screens/register_screen.dart';
 import '../features/auth/screens/role_selection_screen.dart';
 import '../features/chat/screens/chat_screen.dart';
 import '../features/chat/screens/conversations_screen.dart';
+import '../features/guest/screens/guest_shell.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/onboarding/screens/onboarding_screen.dart';
 import '../features/owner/screens/add_property_screen.dart';
@@ -31,8 +33,22 @@ import '../features/tenant/screens/my_requests_screen.dart';
 import '../features/tenant/screens/property_detail_screen.dart';
 import '../features/tenant/screens/tenant_shell.dart';
 
+// route d'accueil naturelle d'un utilisateur selon son rôle
+String _accueilPour(UserRole role) {
+  switch (role) {
+    case UserRole.proprietaire:
+    case UserRole.agent:
+      return AppRoutes.tableauBordProprietaire;
+    case UserRole.locataire:
+      return AppRoutes.rechercheLocataire;
+    case UserRole.admin:
+      return AppRoutes.tableauBordAdmin;
+  }
+}
+
 final routeurApp = Provider<GoRouter>((ref) {
   final etatAuth = ref.watch(authStateProvider);
+  final utilisateurAsync = ref.watch(utilisateurActuelProvider);
 
   return GoRouter(
     initialLocation: '/',
@@ -45,12 +61,39 @@ final routeurApp = Provider<GoRouter>((ref) {
         AppRoutes.inscription,
         AppRoutes.choixRole,
         AppRoutes.onboarding,
+        AppRoutes.invite,
         '/',
       ];
 
       if (!estConnecte && !routesPubliques.contains(loc)) {
-        return AppRoutes.connexion;
+        return AppRoutes.invite;
       }
+
+      // garde de rôle : défense en profondeur côté app pour qu'un
+      // utilisateur connecté ne puisse pas naviguer directement (URL,
+      // lien profond) vers l'espace d'un autre rôle. La vraie protection
+      // des données reste les règles Firestore, à durcir côté console.
+      final utilisateur = utilisateurAsync.asData?.value;
+      if (estConnecte && utilisateur != null) {
+        final estRouteAdmin = loc.startsWith('/admin');
+        final estRouteProprietaire = loc.startsWith('/proprietaire');
+        final estRouteLocataire = loc.startsWith('/locataire');
+
+        final estProprietaireOuAgent =
+            utilisateur.role == UserRole.proprietaire ||
+            utilisateur.role == UserRole.agent;
+
+        if (estRouteAdmin && utilisateur.role != UserRole.admin) {
+          return _accueilPour(utilisateur.role);
+        }
+        if (estRouteProprietaire && !estProprietaireOuAgent) {
+          return _accueilPour(utilisateur.role);
+        }
+        if (estRouteLocataire && utilisateur.role != UserRole.locataire) {
+          return _accueilPour(utilisateur.role);
+        }
+      }
+
       return null;
     },
     routes: [
@@ -74,6 +117,12 @@ final routeurApp = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.choixRole,
         builder: (context, state) => const RoleSelectionScreen(),
+      ),
+
+      // ── SHELL INVITÉ (sans compte) ──
+      GoRoute(
+        path: AppRoutes.invite,
+        builder: (context, state) => const GuestShell(),
       ),
 
       // ── SHELL LOCATAIRE ──

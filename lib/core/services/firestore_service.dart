@@ -67,7 +67,12 @@ class FirestoreService {
         .map((s) => s.docs.map(PropertyModel.fromFirestore).toList());
   }
 
-  // rechercher des biens avec filtres
+  // rechercher des biens avec filtres — lit la vitrine publique
+  // ("properties_public", champs non sensibles seulement) plutôt que le
+  // document complet, pour que le fil soit consultable sans compte sans
+  // exposer l'adresse exacte, le GPS précis ou le nom du propriétaire.
+  // Le détail complet d'un bien reste lu depuis "properties" (voir
+  // getBienParId / recupererBien), qui nécessite d'être connecté.
   Stream<List<PropertyModel>> rechercherBiens({
     String? ville,
     double? prixMax,
@@ -75,7 +80,7 @@ class FirestoreService {
     int? nombrePieces,
   }) {
     Query query = _db
-        .collection('properties')
+        .collection('properties_public')
         .where('estDisponible', isEqualTo: true);
 
     if (ville != null && ville.isNotEmpty) {
@@ -439,14 +444,18 @@ class FirestoreService {
   Future<void> creerAlerte({
     required String locataireId,
     required String ville,
+    String? commune,
     double? prixMax,
     String? type,
+    List<String> equipements = const [],
   }) async {
     await _db.collection('searchAlerts').add({
       'locataireId': locataireId,
       'ville': ville,
+      'commune': commune,
       'prixMax': prixMax,
       'type': type,
+      'equipements': equipements,
       'dateCreation': Timestamp.fromDate(DateTime.now()),
       'active': true,
     });

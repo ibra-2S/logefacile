@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/equipements.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/commune_dropdown.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../features/auth/providers/auth_provider.dart';
@@ -16,9 +18,11 @@ class AlertsScreen extends ConsumerStatefulWidget {
 
 class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   final _firestoreService = FirestoreService();
-  final _villeCtrl = TextEditingController();
+  final _villeCtrl = TextEditingController(text: 'Conakry');
   final _prixMaxCtrl = TextEditingController();
   TypeBienAlerte? _typeSelectionne;
+  String? _communeSelectionnee;
+  final List<String> _equipementsSelectionnes = [];
   bool _chargement = false;
 
   @override
@@ -29,13 +33,6 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   }
 
   Future<void> _creerAlerte() async {
-    if (_villeCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez entrer une ville')),
-      );
-      return;
-    }
-
     setState(() => _chargement = true);
     final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
     if (utilisateur == null) return;
@@ -43,14 +40,19 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     await _firestoreService.creerAlerte(
       locataireId: utilisateur.uid,
       ville: _villeCtrl.text.trim(),
+      commune: _communeSelectionnee,
       prixMax: double.tryParse(_prixMaxCtrl.text.trim()),
       type: _typeSelectionne?.name,
+      equipements: _equipementsSelectionnes,
     );
 
-    setState(() => _chargement = false);
-    _villeCtrl.clear();
+    setState(() {
+      _chargement = false;
+      _typeSelectionne = null;
+      _communeSelectionnee = null;
+      _equipementsSelectionnes.clear();
+    });
     _prixMaxCtrl.clear();
-    setState(() => _typeSelectionne = null);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -114,7 +116,23 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _champTexte('Ville *', 'Ex: Conakry', _villeCtrl),
+                  _champTexte(
+                    'Ville',
+                    'Conakry',
+                    _villeCtrl,
+                    actif: false,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'LogeFacile est disponible uniquement à Conakry.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondaire),
+                  ),
+                  const SizedBox(height: 12),
+                  CommuneDropdown(
+                    valeur: _communeSelectionnee,
+                    onChanged: (v) => setState(() => _communeSelectionnee = v),
+                    border: Border.all(color: AppColors.grisClair),
+                  ),
                   const SizedBox(height: 12),
                   _champTexte(
                     'Prix maximum (GNF)',
@@ -178,6 +196,67 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                             );
                           }).toList(),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Commodités souhaitées',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: AppColors.texte,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Un bien correspond dès qu\'il a au moins une des '
+                    'commodités cochées ici.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondaire),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children:
+                        equipementsDisponibles.map((eq) {
+                          final estCoche = _equipementsSelectionnes.contains(
+                            eq,
+                          );
+                          return GestureDetector(
+                            onTap:
+                                () => setState(() {
+                                  estCoche
+                                      ? _equipementsSelectionnes.remove(eq)
+                                      : _equipementsSelectionnes.add(eq);
+                                }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    estCoche
+                                        ? AppColors.bleuFonce
+                                        : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color:
+                                      estCoche
+                                          ? AppColors.bleuFonce
+                                          : AppColors.grisClair,
+                                ),
+                              ),
+                              child: Text(
+                                eq,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color:
+                                      estCoche ? Colors.white : AppColors.texte,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -279,7 +358,9 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        alerte['ville'] ?? '',
+                                        alerte['commune'] != null
+                                            ? '${alerte['commune']} — ${alerte['ville'] ?? ''}'
+                                            : alerte['ville'] ?? '',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                           color: AppColors.texte,
@@ -296,6 +377,17 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                                       if (alerte['type'] != null)
                                         Text(
                                           alerte['type'],
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondaire,
+                                          ),
+                                        ),
+                                      if ((alerte['equipements'] as List?)
+                                              ?.isNotEmpty ??
+                                          false)
+                                        Text(
+                                          (alerte['equipements'] as List)
+                                              .join(', '),
                                           style: const TextStyle(
                                             fontSize: 12,
                                             color: AppColors.textSecondaire,
@@ -332,6 +424,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     String hint,
     TextEditingController ctrl, {
     TextInputType type = TextInputType.text,
+    bool actif = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,19 +441,36 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
         TextField(
           controller: ctrl,
           keyboardType: type,
+          enabled: actif,
+          style: TextStyle(
+            fontSize: 14,
+            color: actif ? AppColors.texte : AppColors.textSecondaire,
+          ),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(
               color: AppColors.texteLeger,
               fontSize: 13,
             ),
+            suffixIcon:
+                actif
+                    ? null
+                    : const Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: AppColors.textSecondaire,
+                    ),
             filled: true,
-            fillColor: AppColors.fond,
+            fillColor: actif ? AppColors.fond : const Color(0xFFEDEEF1),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.grisClair),
             ),
             enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.grisClair),
+            ),
+            disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.grisClair),
             ),

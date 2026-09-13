@@ -98,7 +98,27 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     if (mounted) setState(() => _enFavori = estFavori);
   }
 
+  /// affiche une invite à se connecter et retourne `true` si l'utilisateur
+  /// n'est pas connecté (l'appelant doit alors arrêter son action)
+  bool _exigerConnexion() {
+    final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
+    if (utilisateur != null) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Connectez-vous pour accéder à cette fonctionnalité.'),
+        backgroundColor: AppColors.bleuFonce,
+        action: SnackBarAction(
+          label: 'Se connecter',
+          textColor: Colors.white,
+          onPressed: () => context.go(AppRoutes.connexion),
+        ),
+      ),
+    );
+    return true;
+  }
+
   Future<void> _toggleFavori(PropertyModel bien) async {
+    if (_exigerConnexion()) return;
     final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
     if (utilisateur == null) return;
     setState(() => _chargementFavori = true);
@@ -153,6 +173,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
 
   /// petit menu : message dans l'app ou WhatsApp
   Future<void> _choisirModeContact(PropertyModel bien) async {
+    if (_exigerConnexion()) return;
     final infos = await _obtenirInfosProprietaire(bien.proprietaireId);
     final telephone = infos['telephone'] ?? '';
     final aWhatsApp = ContactService.aUnNumero(telephone);
@@ -214,6 +235,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
   }
 
   Future<void> _demanderVisite(PropertyModel bien) async {
+    if (_exigerConnexion()) return;
     final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
     if (utilisateur == null) return;
 
@@ -296,6 +318,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
   }
 
   Future<void> _signalerBien(PropertyModel bien) async {
+    if (_exigerConnexion()) return;
     final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
     if (utilisateur == null) return;
 
@@ -682,7 +705,7 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                '${bien.quartier ?? ''} — ${bien.ville}',
+                                bien.localisationCourte,
                                 style: const TextStyle(
                                   fontSize: 14,
                                   color: AppColors.textSecondaire,

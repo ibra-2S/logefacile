@@ -9,6 +9,7 @@ enum TypeNotification {
   demandeRefusee,
   demandeAnnulee,
   message,
+  alerteCorrespondante,
   autre,
 }
 
@@ -84,6 +85,7 @@ class NotificationModel {
     TypeNotification.demandeRefusee => Icons.cancel_outlined,
     TypeNotification.demandeAnnulee => Icons.event_busy_outlined,
     TypeNotification.message => Icons.chat_bubble_outline,
+    TypeNotification.alerteCorrespondante => Icons.notifications_active_outlined,
     TypeNotification.autre => Icons.notifications_outlined,
   };
 
@@ -93,6 +95,7 @@ class NotificationModel {
     TypeNotification.demandeRefusee => AppColors.erreur,
     TypeNotification.demandeAnnulee => AppColors.grisMoyen,
     TypeNotification.message => AppColors.tealLocataire,
+    TypeNotification.alerteCorrespondante => AppColors.vertProprietaire,
     TypeNotification.autre => AppColors.bleuMoyen,
   };
 }

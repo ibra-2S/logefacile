@@ -1,15 +1,15 @@
-import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/models/user_model.dart';
+import '../../../core/services/cloudinary_service.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -20,9 +20,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  static const String _cloudName = 'dfxnwioow';
-  static const String _uploadPreset = 'g1qqzyep';
-
   bool _uploadPhoto = false;
   bool _uploadPiece = false;
   bool _selectionEnCours = false;
@@ -45,23 +42,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     setState(() => _uploadPiece = true);
     try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload'),
-      );
-      request.fields['upload_preset'] = _uploadPreset;
-      request.files.add(await http.MultipartFile.fromPath('file', image.path));
-      final response = await request.send();
-      final jsonData = jsonDecode(await response.stream.bytesToString());
-
-      if (response.statusCode == 200) {
+      final url = await CloudinaryService.uploaderImage(File(image.path));
+      if (url != null) {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(utilisateur.uid)
-            .update({
-              'carteIdentiteUrl': jsonData['secure_url'],
-              'carteVerifiee': false,
-            });
+            .update({'carteIdentiteUrl': url, 'carteVerifiee': false});
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -72,9 +58,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           );
         }
-      }
-    } catch (_) {
-      if (mounted) {
+      } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Échec de l'envoi. Réessayez."),
@@ -109,19 +93,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _uploadPhoto = true);
 
     try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload'),
+      final photoUrl = await CloudinaryService.uploaderImage(
+        File(image.path),
       );
-      request.fields['upload_preset'] = _uploadPreset;
-      request.files.add(await http.MultipartFile.fromPath('file', image.path));
-
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      final jsonData = jsonDecode(responseData);
-
-      if (response.statusCode == 200) {
-        final photoUrl = jsonData['secure_url'] as String;
+      if (photoUrl != null) {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(utilisateur.uid)
@@ -135,9 +110,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           );
         }
-      }
-    } catch (e) {
-      if (mounted) {
+      } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erreur lors du chargement de la photo.'),
@@ -182,6 +155,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   utilisateur,
                                 ),
                           ),
+                          if (utilisateur.estLocataire)
+                            _tuile(
+                              Icons.notifications_active_outlined,
+                              'Mes alertes',
+                              onTap: () => context.push(AppRoutes.mesAlertes),
+                            ),
                           _tuile(
                             Icons.settings_outlined,
                             'Paramètres',
@@ -252,7 +231,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          'LogeFacile · version 1.0.0',
+                          'LogeFacile · version 1.4.7',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppColors.texteLeger,

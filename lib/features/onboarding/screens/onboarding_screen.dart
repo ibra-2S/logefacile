@@ -63,7 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _terminer() async {
     await PrefsService.marquerOnboardingVu();
-    if (mounted) context.go(AppRoutes.connexion);
+    if (mounted) context.go(AppRoutes.invite);
   }
 
   @override

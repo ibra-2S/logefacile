@@ -159,7 +159,7 @@ class _CarteFavori extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${bien.quartier ?? ''} — ${bien.ville}',
+                      bien.localisationCourte,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondaire,

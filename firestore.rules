@@ -1,0 +1,142 @@
+rules_version = '2';
+
+// Règles Firestore LogeFacile — à coller intégralement dans
+// Firebase Console → Firestore Database → Règles, puis « Publier ».
+// (fichier gardé ici pour référence/versionnement ; Firestore ne le lit
+// pas automatiquement depuis ce repo, il faut le coller dans la console
+// ou déployer avec `firebase deploy --only firestore:rules` si tu
+// configures un jour le CLI pour ce fichier)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function connecte() { return request.auth != null; }
+    function estMoi(uid) { return request.auth.uid == uid; }
+
+    // true si l'utilisateur connecté a le rôle "admin" dans son propre document
+    function estAdmin() {
+      return connecte()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // true si l'utilisateur a le droit de publier une annonce (locataire :
+    // toujours ; propriétaire/agent : seulement une fois validé par un admin)
+    function peutPublier() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return !(u.role in ['proprietaire', 'agent']) || u.estVerifie == true;
+    }
+
+    // Utilisateurs : chacun lit/écrit son propre document, mais ne peut
+    // jamais changer lui-même son rôle ou son statut de validation/
+    // suspension — seul un admin le peut. Sans ça, n'importe quel compte
+    // pourrait s'auto-déclarer admin ou se valider lui-même.
+    match /users/{uid} {
+      allow read: if connecte();
+      allow create: if estMoi(uid)
+        && request.resource.data.role in ['locataire', 'proprietaire', 'agent']
+        && request.resource.data.estVerifie == false
+        && request.resource.data.estActif == true;
+      allow update: if estAdmin()
+        || (estMoi(uid)
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.estVerifie == resource.data.estVerifie
+            && request.resource.data.estActif == resource.data.estActif);
+      allow delete: if estMoi(uid) || estAdmin();
+    }
+
+    // Biens : document complet, réservé aux comptes connectés (contient
+    // adresse exacte, GPS précis, nom réel du propriétaire...).
+    // La vitrine publique pour les invités est dans properties_public.
+    match /properties/{id} {
+      allow read: if connecte();
+      allow create: if connecte()
+        && request.resource.data.proprietaireId == request.auth.uid
+        && peutPublier();
+      allow update: if connecte() && (
+        resource.data.proprietaireId == request.auth.uid
+        || estAdmin()
+        || request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['nombreVues', 'statsVues', 'nombreFavoris',
+                       'noteMoyenne', 'nombreAvis'])
+      );
+      allow delete: if connecte() && (
+        resource.data.proprietaireId == request.auth.uid || estAdmin()
+      );
+    }
+
+    // Vitrine publique des biens (titre, prix, type, commune, photos...) —
+    // écrite uniquement par la Cloud Function miroirBienPublic (Admin SDK,
+    // qui n'est jamais soumis à ces règles). Aucune écriture cliente.
+    match /properties_public/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Favoris : chacun ne lit/crée/supprime que ses propres favoris.
+    match /favorites/{id} {
+      allow read: if connecte() && resource.data.tenantId == request.auth.uid;
+      allow create: if connecte() && request.resource.data.tenantId == request.auth.uid;
+      allow delete: if connecte() && resource.data.tenantId == request.auth.uid;
+    }
+
+    // Demandes de visite : lisibles/modifiables seulement par le locataire
+    // ou le propriétaire concernés (ou un admin).
+    match /visitRequests/{id} {
+      allow read: if connecte() && (
+        resource.data.locataireId == request.auth.uid ||
+        resource.data.proprietaireId == request.auth.uid ||
+        estAdmin()
+      );
+      allow create: if connecte() && request.resource.data.locataireId == request.auth.uid;
+      allow update, delete: if connecte() && (
+        resource.data.locataireId == request.auth.uid ||
+        resource.data.proprietaireId == request.auth.uid ||
+        estAdmin()
+      );
+    }
+
+    // Conversations et messages
+    match /conversations/{id} {
+      allow read, create, update: if connecte();
+      match /messages/{mid} {
+        allow read, create, update: if connecte();
+      }
+    }
+
+    // Alertes de recherche
+    match /searchAlerts/{id} {
+      allow read, write: if connecte();
+    }
+
+    // Notifications in-app : n'importe quel utilisateur connecté peut créer
+    // une notification pour un autre (messages, demandes de visite...),
+    // mais seulement avec un type reconnu par l'app ; seul le destinataire
+    // la lit/modifie.
+    match /notifications/{id} {
+      allow create: if connecte()
+        && request.resource.data.type in [
+             'message', 'demandeVisite', 'demandeAcceptee',
+             'demandeRefusee', 'demandeAnnulee', 'alerteCorrespondante'
+           ];
+      allow read, update, delete: if connecte()
+        && resource.data.destinataireId == request.auth.uid;
+    }
+
+    // Signalements et messages de support : création par tout utilisateur
+    // connecté (sur son propre nom), lecture/traitement réservés à l'admin.
+    match /reports/{id} {
+      allow create: if connecte() && request.resource.data.signalePar == request.auth.uid;
+      allow read, update: if estAdmin();
+    }
+    match /support_messages/{id} {
+      allow create: if connecte() && request.resource.data.uid == request.auth.uid;
+      allow read, update: if estAdmin();
+    }
+
+    // Avis : chacun ne modifie que son propre avis.
+    match /reviews/{id} {
+      allow read: if connecte();
+      allow create: if connecte() && request.resource.data.locataireId == request.auth.uid;
+      allow update: if connecte() && resource.data.locataireId == request.auth.uid;
+    }
+  }
+}

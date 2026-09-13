@@ -1,13 +1,19 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/constants/equipements.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/models/user_model.dart';
+import '../../../core/services/cloudinary_service.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/widgets/commune_dropdown.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/property_photo.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -279,6 +285,7 @@ class _CarteBien extends StatelessWidget {
     );
 
     TypeBien typeSelectionne = bien.type;
+    String? communeSelectionnee = bien.commune;
     bool avecCaution = bien.moisCaution != null;
     int moisCaution = bien.moisCaution ?? 1;
     bool avecAvance = bien.moisAvance != null;
@@ -286,14 +293,14 @@ class _CarteBien extends StatelessWidget {
     bool avecFraisAgence = bien.fraisAgence != null;
     List<String> equipementsSelectionnes = List.from(bien.equipements);
 
-    final equipements = [
-      'wifi',
-      'parking',
-      'eau',
-      'électricité',
-      'climatisation',
-      'gardien',
-    ];
+    // photos : celles déjà en ligne (URLs) + celles ajoutées localement
+    // (fichiers, pas encore téléversées)
+    final photosExistantes = List<String>.from(bien.photos);
+    final nouvellesPhotos = <File>[];
+    bool enregistrementEnCours = false;
+    final imagePicker = ImagePicker();
+
+    final equipements = equipementsDisponibles;
     final labels = {
       TypeBien.maison: '🏠 Maison',
       TypeBien.appartement: '🏢 Appartement',
@@ -393,6 +400,165 @@ class _CarteBien extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
 
+                        // ── PHOTOS ──
+                        _titreSectionn('Photos (max 5)'),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 100,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              if (photosExistantes.length +
+                                      nouvellesPhotos.length <
+                                  5)
+                                GestureDetector(
+                                  onTap: () async {
+                                    final restantes =
+                                        5 -
+                                        (photosExistantes.length +
+                                            nouvellesPhotos.length);
+                                    final images = await imagePicker
+                                        .pickMultiImage(limit: restantes);
+                                    if (images.isNotEmpty) {
+                                      setStateModal(() {
+                                        for (final img in images) {
+                                          if (photosExistantes.length +
+                                                  nouvellesPhotos.length <
+                                              5) {
+                                            nouvellesPhotos.add(
+                                              File(img.path),
+                                            );
+                                          }
+                                        }
+                                      });
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 90,
+                                    height: 90,
+                                    margin: const EdgeInsets.only(right: 10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF5F5F5),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: AppColors.grisClair,
+                                      ),
+                                    ),
+                                    child: const Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.add_photo_alternate_outlined,
+                                          color: AppColors.bleuFonce,
+                                          size: 28,
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Ajouter',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.bleuFonce,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ...photosExistantes.asMap().entries.map((
+                                entry,
+                              ) {
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      width: 90,
+                                      height: 90,
+                                      margin: const EdgeInsets.only(right: 10),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(
+                                          12,
+                                        ),
+                                        image: DecorationImage(
+                                          image: NetworkImage(entry.value),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 4,
+                                      right: 14,
+                                      child: GestureDetector(
+                                        onTap:
+                                            () => setStateModal(
+                                              () => photosExistantes
+                                                  .removeAt(entry.key),
+                                            ),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                              ...nouvellesPhotos.asMap().entries.map((entry) {
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      width: 90,
+                                      height: 90,
+                                      margin: const EdgeInsets.only(right: 10),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(
+                                          12,
+                                        ),
+                                        image: DecorationImage(
+                                          image: FileImage(entry.value),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 4,
+                                      right: 14,
+                                      child: GestureDetector(
+                                        onTap:
+                                            () => setStateModal(
+                                              () => nouvellesPhotos.removeAt(
+                                                entry.key,
+                                              ),
+                                            ),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // ── AGENT : nom propriétaire ──
                         if (estAgent) ...[
                           _champEdition(
@@ -415,9 +581,18 @@ class _CarteBien extends StatelessWidget {
                         const SizedBox(height: 8),
                         _champEdition('Ville *', villeCtrl),
                         const SizedBox(height: 12),
-                        _champEdition('Adresse *', adresseCtrl),
+                        CommuneDropdown(
+                          valeur: communeSelectionnee,
+                          onChanged: (v) =>
+                              setStateModal(() => communeSelectionnee = v),
+                          fillColor: const Color(0xFFF5F5F5),
+                          labelFontSize: 12,
+                          contentPaddingHorizontal: 14,
+                        ),
                         const SizedBox(height: 12),
                         _champEdition('Quartier', quartierCtrl),
+                        const SizedBox(height: 12),
+                        _champEdition('Adresse *', adresseCtrl),
                         const SizedBox(height: 16),
 
                         // ── DÉTAILS ──
@@ -656,73 +831,107 @@ class _CarteBien extends StatelessWidget {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: () async {
-                              final donnees = {
-                                'titre': titreCtrl.text.trim(),
-                                'description': descCtrl.text.trim(),
-                                'type': typeSelectionne.name,
-                                'prix':
-                                    double.tryParse(prixCtrl.text.trim()) ??
-                                    bien.prix,
-                                'surface': double.tryParse(
-                                  surfaceCtrl.text.trim(),
-                                ),
-                                'nombrePieces': int.tryParse(
-                                  piecesCtrl.text.trim(),
-                                ),
-                                'nombreChambres': int.tryParse(
-                                  chambresCtrl.text.trim(),
-                                ),
-                                'nombreToilettes': int.tryParse(
-                                  toilettesCtrl.text.trim(),
-                                ),
-                                'nombreCuisines': int.tryParse(
-                                  cuisinesCtrl.text.trim(),
-                                ),
-                                'ville': villeCtrl.text.trim(),
-                                'adresse': adresseCtrl.text.trim(),
-                                'quartier':
-                                    quartierCtrl.text.trim().isEmpty
-                                        ? null
-                                        : quartierCtrl.text.trim(),
-                                'nomProprietaireReel':
-                                    estAgent &&
-                                            nomProprietaireCtrl.text
-                                                .trim()
-                                                .isNotEmpty
-                                        ? nomProprietaireCtrl.text.trim()
-                                        : null,
-                                'equipements': equipementsSelectionnes,
-                                'moisCaution': avecCaution ? moisCaution : null,
-                                'moisAvance': avecAvance ? moisAvance : null,
-                                'fraisAgence':
-                                    estAgent &&
-                                            avecFraisAgence &&
-                                            fraisAgenceCtrl.text
-                                                .trim()
-                                                .isNotEmpty
-                                        ? double.tryParse(
-                                          fraisAgenceCtrl.text.trim(),
-                                        )
-                                        : null,
-                                'dateMiseAJour': Timestamp.fromDate(
-                                  DateTime.now(),
-                                ),
-                              };
-                              Navigator.pop(ctx);
-                              await firestoreService.modifierBien(
-                                bien.id,
-                                donnees,
-                              );
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Bien modifié avec succès !'),
-                                    backgroundColor: AppColors.succes,
-                                  ),
-                                );
-                              }
-                            },
+                            onPressed:
+                                enregistrementEnCours
+                                    ? null
+                                    : () async {
+                                      setStateModal(
+                                        () => enregistrementEnCours = true,
+                                      );
+
+                                      final photosFinales = List<String>.from(
+                                        photosExistantes,
+                                      )..addAll(
+                                        await CloudinaryService.uploaderImages(
+                                          nouvellesPhotos,
+                                        ),
+                                      );
+
+                                      final donnees = {
+                                        'titre': titreCtrl.text.trim(),
+                                        'description': descCtrl.text.trim(),
+                                        'type': typeSelectionne.name,
+                                        'prix':
+                                            double.tryParse(
+                                              prixCtrl.text.trim(),
+                                            ) ??
+                                            bien.prix,
+                                        'surface': double.tryParse(
+                                          surfaceCtrl.text.trim(),
+                                        ),
+                                        'nombrePieces': int.tryParse(
+                                          piecesCtrl.text.trim(),
+                                        ),
+                                        'nombreChambres': int.tryParse(
+                                          chambresCtrl.text.trim(),
+                                        ),
+                                        'nombreToilettes': int.tryParse(
+                                          toilettesCtrl.text.trim(),
+                                        ),
+                                        'nombreCuisines': int.tryParse(
+                                          cuisinesCtrl.text.trim(),
+                                        ),
+                                        'ville': villeCtrl.text.trim(),
+                                        'commune': communeSelectionnee,
+                                        'adresse': adresseCtrl.text.trim(),
+                                        'quartier':
+                                            quartierCtrl.text.trim().isEmpty
+                                                ? null
+                                                : quartierCtrl.text.trim(),
+                                        'photos': photosFinales,
+                                        'nomProprietaireReel':
+                                            estAgent &&
+                                                    nomProprietaireCtrl.text
+                                                        .trim()
+                                                        .isNotEmpty
+                                                ? nomProprietaireCtrl.text
+                                                    .trim()
+                                                : null,
+                                        'equipements': equipementsSelectionnes,
+                                        'moisCaution':
+                                            avecCaution ? moisCaution : null,
+                                        'moisAvance':
+                                            avecAvance ? moisAvance : null,
+                                        'fraisAgence':
+                                            estAgent &&
+                                                    avecFraisAgence &&
+                                                    fraisAgenceCtrl.text
+                                                        .trim()
+                                                        .isNotEmpty
+                                                ? double.tryParse(
+                                                  fraisAgenceCtrl.text.trim(),
+                                                )
+                                                : null,
+                                        'dateMiseAJour': Timestamp.fromDate(
+                                          DateTime.now(),
+                                        ),
+                                      };
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                      await firestoreService.modifierBien(
+                                        bien.id,
+                                        donnees,
+                                      );
+                                      if (context.mounted) {
+                                        final photosEchouees =
+                                            nouvellesPhotos.length -
+                                            (photosFinales.length -
+                                                photosExistantes.length);
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              photosEchouees > 0
+                                                  ? 'Bien modifié, mais $photosEchouees photo(s) n\'ont pas pu être envoyées.'
+                                                  : 'Bien modifié avec succès !',
+                                            ),
+                                            backgroundColor: photosEchouees > 0
+                                                ? AppColors.avertissement
+                                                : AppColors.succes,
+                                          ),
+                                        );
+                                      }
+                                    },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.bleuFonce,
                               shape: RoundedRectangleBorder(
@@ -730,14 +939,24 @@ class _CarteBien extends StatelessWidget {
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
-                            child: const Text(
-                              'Enregistrer',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            child:
+                                enregistrementEnCours
+                                    ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Text(
+                                      'Enregistrer',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                           ),
                         ),
                       ],
@@ -758,6 +977,7 @@ class _CarteBien extends StatelessWidget {
       ),
     );
   }
+
 
   static Widget _champEdition(
     String label,
@@ -912,7 +1132,7 @@ class _CarteBien extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${bien.quartier ?? ''} ${bien.ville}',
+                      bien.localisationCourte,
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondaire,

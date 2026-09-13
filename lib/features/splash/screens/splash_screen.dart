@@ -49,7 +49,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             final vu = await PrefsService.onboardingVu();
             if (!mounted || _dejaRedirige) return;
             _dejaRedirige = true;
-            context.go(vu ? AppRoutes.connexion : AppRoutes.onboarding);
+            context.go(vu ? AppRoutes.invite : AppRoutes.onboarding);
           });
         } else {
           Future.microtask(() async {

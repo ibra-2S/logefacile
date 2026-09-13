@@ -4,6 +4,7 @@ class AppRoutes {
   static const connexion = '/connexion';
   static const inscription = '/inscription';
   static const choixRole = '/choix-role';
+  static const invite = '/invite';
 
   // propriétaire et agent
   static const tableauBordProprietaire = '/proprietaire';

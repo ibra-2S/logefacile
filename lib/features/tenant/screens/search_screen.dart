@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/constants/communes.dart';
 import '../../../core/models/property_model.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../core/widgets/cloche_notifications.dart';
@@ -56,21 +59,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _prixMax != null ||
       _chambresMin != null;
 
-  static const _communesConakry = <String>[
-    'Kaloum',
-    'Dixinn',
-    'Ratoma',
-    'Matam',
-    'Matoto',
-    'Lambanyi',
-    'Sonfonia',
-    'Gbessia',
-    'Kagbélén',
-    'Sanoyah',
-    'Manéah',
-    'Tombolia',
-  ];
-
   static const _types = <Map<String, String>>[
     {'valeur': 'maison', 'label': '🏠 Maison'},
     {'valeur': 'appartement', 'label': '🏢 Appartement'},
@@ -97,11 +85,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   List<PropertyModel> _appliquerTriEtFiltres(List<PropertyModel> biens) {
     var resultat =
         biens.where((b) {
-          // zone / commune
+          // zone / commune : les biens qui renseignent leur commune sont
+          // filtrés dessus ; les anciennes annonces sans commune renseignée
+          // retombent sur une recherche texte pour rester trouvables.
           if (_zone != null) {
-            final texte =
-                '${b.ville} ${b.quartier ?? ''} ${b.adresse}'.toLowerCase();
-            if (!texte.contains(_zone!.toLowerCase())) return false;
+            final correspondCommune = b.commune == _zone;
+            final correspondTexte =
+                b.commune == null &&
+                '${b.ville} ${b.quartier ?? ''} ${b.adresse}'
+                    .toLowerCase()
+                    .contains(_zone!.toLowerCase());
+            if (!correspondCommune && !correspondTexte) return false;
           }
           // type
           if (_typeSelectionne != null && b.type.name != _typeSelectionne) {
@@ -110,8 +104,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           // prix
           if (_prixMax != null && b.prix > _prixMax!) return false;
           // chambres
-          if (_chambresMin != null &&
-              (b.nombreChambres ?? 0) < _chambresMin!) {
+          if (_chambresMin != null && (b.nombreChambres ?? 0) < _chambresMin!) {
             return false;
           }
           return true;
@@ -201,15 +194,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                   value: null,
                                   child: Text('Toutes les communes'),
                                 ),
-                                ..._communesConakry.map(
+                                ...communesConakry.map(
                                   (c) => DropdownMenuItem<String?>(
                                     value: c,
                                     child: Text(c),
                                   ),
                                 ),
                               ],
-                              onChanged:
-                                  (v) => setSheet(() => zoneTemp = v),
+                              onChanged: (v) => setSheet(() => zoneTemp = v),
                             ),
                           ),
                         ),
@@ -230,9 +222,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               (t) => _chip(
                                 t['label']!,
                                 typeTemp == t['valeur'],
-                                () => setSheet(
-                                  () => typeTemp = t['valeur'],
-                                ),
+                                () => setSheet(() => typeTemp = t['valeur']),
                               ),
                             ),
                           ],
@@ -395,16 +385,102 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  String _resumeFiltres() {
-    final parts = <String>[];
-    parts.add(_zone ?? 'Toutes les communes');
-    if (_typeSelectionne != null) {
-      parts.add(
-        _types.firstWhere((t) => t['valeur'] == _typeSelectionne)['label']!,
-      );
-    }
-    if (_tri != TriAnnonce.recentes) parts.add(_tri.label);
-    return parts.join('  ·  ');
+  void _ouvrirListeCommunes() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (ctx) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.grisClair,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Choisir une commune',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.texte,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _optionCommune(
+                            ctx,
+                            label: 'Toutes les communes',
+                            selectionnee: _zone == null,
+                            onTap: () {
+                              setState(() => _zone = null);
+                              Navigator.pop(ctx);
+                            },
+                          ),
+                          ...communesConakry.map(
+                            (c) => _optionCommune(
+                              ctx,
+                              label: c,
+                              selectionnee: _zone == c,
+                              onTap: () {
+                                setState(() => _zone = c);
+                                Navigator.pop(ctx);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  Widget _optionCommune(
+    BuildContext ctx, {
+    required String label,
+    required bool selectionnee,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        selectionnee ? Icons.location_on : Icons.location_on_outlined,
+        color: selectionnee ? AppColors.bleuFonce : AppColors.textSecondaire,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: selectionnee ? FontWeight.w700 : FontWeight.w500,
+          color: selectionnee ? AppColors.bleuFonce : AppColors.texte,
+        ),
+      ),
+      trailing:
+          selectionnee
+              ? const Icon(Icons.check, color: AppColors.bleuFonce)
+              : null,
+      onTap: onTap,
+    );
   }
 
   @override
@@ -451,7 +527,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           const SizedBox(height: 4),
                           const Text(
                             'Trouvez votre logement idéal',
-                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -505,10 +584,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
-                            const Icon(
-                              Icons.tune,
-                              color: AppColors.bleuFonce,
-                            ),
+                            const Icon(Icons.tune, color: AppColors.bleuFonce),
                             if (_filtresActifs)
                               Positioned(
                                 top: 10,
@@ -532,14 +608,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
           ),
 
-          // ligne résumé filtres + accès "Mes demandes"
+          // ligne commune + accès "Mes demandes" — ouvre juste la liste des
+          // communes, pas le filtre complet (accessible via l'icône réglages)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
             child: Row(
               children: [
                 Expanded(
                   child: GestureDetector(
-                    onTap: _ouvrirTri,
+                    onTap: _ouvrirListeCommunes,
                     child: Row(
                       children: [
                         const Icon(
@@ -550,7 +627,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            _resumeFiltres(),
+                            _zone ?? 'Toutes les communes',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -564,11 +641,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ),
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: () => context.push(AppRoutes.mesDemandesVisite),
-                  icon: const Icon(Icons.list_alt, size: 16),
-                  label: const Text('Mes demandes'),
-                ),
+                if (utilisateur != null)
+                  TextButton.icon(
+                    onPressed: () => context.push(AppRoutes.mesDemandesVisite),
+                    icon: const Icon(Icons.list_alt, size: 16),
+                    label: const Text('Mes demandes'),
+                  ),
               ],
             ),
           ),
@@ -583,6 +661,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   return const PropertyListSkeleton();
                 }
 
+                if (snapshot.hasError) {
+                  return RefreshIndicator(
+                    onRefresh: _rafraichir,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.55,
+                          child: EmptyState(
+                            icone: Icons.error_outline,
+                            titre: 'Impossible de charger les annonces',
+                            message: '${snapshot.error}',
+                            couleur: AppColors.erreur,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
                 var biens = snapshot.data ?? [];
 
                 if (_rechercheCtrl.text.isNotEmpty) {
@@ -595,12 +693,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 b.adresse.toLowerCase().contains(q) ||
                                 b.ville.toLowerCase().contains(q) ||
                                 (b.quartier?.toLowerCase().contains(q) ??
-                                    false),
+                                    false) ||
+                                (b.commune?.toLowerCase().contains(q) ?? false),
                           )
                           .toList();
                 }
 
                 biens = _appliquerTriEtFiltres(biens);
+
+                // biens les plus consultés PARMI ceux qui correspondent aux
+                // filtres actifs (commune, type, prix...) — le carrousel
+                // s'adapte donc quand on choisit une commune.
+                final vedettes =
+                    ([...biens]..sort(
+                      (a, b) => b.nombreVues.compareTo(a.nombreVues),
+                    )).take(6).toList();
 
                 if (biens.isEmpty) {
                   return RefreshIndicator(
@@ -608,6 +715,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
+                        if (vedettes.isNotEmpty)
+                          _CarrouselVedettes(
+                            vedettes: vedettes,
+                            estInvite: utilisateur == null,
+                          ),
                         SizedBox(
                           height: MediaQuery.of(context).size.height * 0.55,
                           child: EmptyState(
@@ -619,8 +731,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                     : 'Aucune annonce disponible pour le moment. Revenez bientôt !',
                             couleur: AppColors.tealLocataire,
                             action:
-                                _filtresActifs ||
-                                        _rechercheCtrl.text.isNotEmpty
+                                _filtresActifs || _rechercheCtrl.text.isNotEmpty
                                     ? OutlinedButton.icon(
                                       onPressed: () {
                                         setState(() {
@@ -645,14 +756,61 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
                 return RefreshIndicator(
                   onRefresh: _rafraichir,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: biens.length,
-                    itemBuilder: (context, index) {
-                      final bien = biens[index];
-                      return _CarteBien(bien: bien);
-                    },
+                    slivers: [
+                      if (vedettes.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: _CarrouselVedettes(
+                            vedettes: vedettes,
+                            estInvite: utilisateur == null,
+                          ),
+                        ),
+
+                      // séparation avant le fil complet des biens disponibles
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(20, 4, 20, 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Divider(color: AppColors.grisClair, height: 1),
+                              SizedBox(height: 14),
+                              Text(
+                                'Tous nos biens disponibles',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.texte,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // biens disponibles, affichés deux par deux
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                                childAspectRatio: 0.72,
+                              ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => _CarteBienGrille(
+                              key: ValueKey(biens[index].id),
+                              bien: biens[index],
+                              estInvite: utilisateur == null,
+                            ),
+                            childCount: biens.length,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -664,104 +822,483 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _CarteBien extends StatelessWidget {
+/// ouvre la fiche détaillée d'un bien, ou invite l'invité à se connecter
+/// s'il n'a pas de compte — partagé entre le fil principal et le carrousel
+/// des biens en vedette.
+void _ouvrirBienOuInviter(
+  BuildContext context,
+  PropertyModel bien,
+  bool estInvite,
+) {
+  if (!estInvite) {
+    context.push(AppRoutes.detailBien.replaceAll(':id', bien.id));
+    return;
+  }
+
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder:
+        (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.lock_outline,
+                  size: 36,
+                  color: AppColors.bleuFonce,
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Connectez-vous pour voir ce bien',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.texte,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Créez un compte gratuit ou connectez-vous pour consulter '
+                  'les détails, les photos et contacter le propriétaire.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondaire,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      context.go(AppRoutes.connexion);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.bleuFonce,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Se connecter',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      context.push(AppRoutes.choixRole);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.bleuFonce),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "Créer un compte",
+                      style: TextStyle(
+                        color: AppColors.bleuFonce,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+  );
+}
+
+/// carte du fil principal, affichée deux par deux dans la grille : la photo
+/// occupe toute la carte, le texte est incrusté par-dessus (même langage
+/// visuel que la carte du carrousel « En ce moment »).
+class _CarteBienGrille extends StatelessWidget {
   final PropertyModel bien;
-  const _CarteBien({required this.bien});
+  final bool estInvite;
+  const _CarteBienGrille({
+    super.key,
+    required this.bien,
+    required this.estInvite,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap:
-          () => context.push(AppRoutes.detailBien.replaceAll(':id', bien.id)),
+      onTap: () => _ouvrirBienOuInviter(context, bien, estInvite),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
               offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Hero(
-              tag: 'bienPhoto_${bien.id}',
-              child: PropertyPhoto(photos: bien.photos, height: 120),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bien.titre,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Hero(
+                tag: 'bienPhoto_${bien.id}',
+                child: PropertyPhoto(
+                  photos: bien.photos,
+                  height: double.infinity,
+                  width: double.infinity,
+                  borderRadius: BorderRadius.zero,
+                ),
+              ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: [0.5, 1.0],
+                    colors: [Colors.transparent, Colors.black87],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    bien.type.name,
                     style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.texte,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 14,
-                        color: AppColors.textSecondaire,
+                ),
+              ),
+              Positioned(
+                left: 10,
+                right: 10,
+                bottom: 10,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      bien.titre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${bien.quartier ?? ''} — ${bien.ville}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondaire,
-                        ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      bien.localisationCourte,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${bien.prix.toStringAsFixed(0)} GNF/mois',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// bandeau « En ce moment » : un seul carrousel, dans lequel les biens les
+/// plus consultés défilent à tour de rôle (un seul visible à la fois,
+/// défilement automatique + swipe manuel possible). Inséré comme premier
+/// élément du fil pour qu'il défile avec les annonces au lieu de rester
+/// fixé en haut de l'écran.
+class _CarrouselVedettes extends StatefulWidget {
+  final List<PropertyModel> vedettes;
+  final bool estInvite;
+  const _CarrouselVedettes({required this.vedettes, required this.estInvite});
+
+  @override
+  State<_CarrouselVedettes> createState() => _CarrouselVedettesState();
+}
+
+class _CarrouselVedettesState extends State<_CarrouselVedettes> {
+  final _controller = PageController();
+  Timer? _minuteur;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _demarrerMinuteur();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CarrouselVedettes oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // le flux Firestore peut faire varier le nombre de biens en vogue en
+    // direct (nouvelle annonce, changement de tri) — on réajuste l'index
+    // et on relance le minuteur en conséquence.
+    if (oldWidget.vedettes.length != widget.vedettes.length) {
+      if (widget.vedettes.isEmpty) {
+        _index = 0;
+      } else if (_index >= widget.vedettes.length) {
+        _index = 0;
+        if (_controller.hasClients) _controller.jumpToPage(0);
+      }
+      _demarrerMinuteur();
+    }
+  }
+
+  void _demarrerMinuteur() {
+    _minuteur?.cancel();
+    _minuteur = null;
+    if (widget.vedettes.length > 1) {
+      _minuteur = Timer.periodic(const Duration(seconds: 4), (_) {
+        if (!mounted || widget.vedettes.length < 2) return;
+        final suivant = (_index + 1) % widget.vedettes.length;
+        _controller.animateToPage(
+          suivant,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _minuteur?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '🔥 En ce moment',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.texte,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 200,
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: widget.vedettes.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder:
+                  (context, i) => _CarteVedette(
+                    key: ValueKey(widget.vedettes[i].id),
+                    bien: widget.vedettes[i],
+                    estInvite: widget.estInvite,
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${bien.prix.toStringAsFixed(0)} GNF/mois',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.tealLocataire,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.bleuClair,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          bien.type.name,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.bleuFonce,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+            ),
+          ),
+          if (widget.vedettes.length > 1) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                widget.vedettes.length,
+                (i) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: _index == i ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color:
+                        _index == i ? AppColors.bleuFonce : AppColors.grisClair,
+                    borderRadius: BorderRadius.circular(3),
                   ),
-                ],
+                ),
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// carte plein écran (dans le carrousel) d'un bien en vogue — même règle
+/// d'accès que le fil principal (invité redirigé vers la connexion).
+class _CarteVedette extends StatelessWidget {
+  final PropertyModel bien;
+  final bool estInvite;
+  const _CarteVedette({
+    super.key,
+    required this.bien,
+    required this.estInvite,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _ouvrirBienOuInviter(context, bien, estInvite),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // la photo occupe toute la carte
+              PropertyPhoto(
+                photos: bien.photos,
+                height: double.infinity,
+                width: double.infinity,
+                borderRadius: BorderRadius.zero,
+              ),
+              // voile dégradé pour que le texte reste lisible sur la photo
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: [0.45, 1.0],
+                    colors: [Colors.transparent, Colors.black87],
+                  ),
+                ),
+              ),
+              // type de bien, en haut
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    bien.type.name,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              // texte incrusté sur la photo, en bas
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      bien.titre,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          size: 13,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            bien.localisationCourte,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${bien.prix.toStringAsFixed(0)} GNF/mois',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
