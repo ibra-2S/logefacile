@@ -14,11 +14,12 @@
  *   2. npm --prefix functions install
  *   3. node functions/backfill-public-properties.js
  */
-const admin = require("firebase-admin");
+const {initializeApp, cert} = require("firebase-admin/app");
+const {getFirestore} = require("firebase-admin/firestore");
 const serviceAccount = require("./serviceAccountKey.json");
 
-admin.initializeApp({credential: admin.credential.cert(serviceAccount)});
-const db = admin.firestore();
+initializeApp({credential: cert(serviceAccount)});
+const db = getFirestore();
 
 const CHAMPS_PUBLICS = [
   "titre", "type", "statut", "prix", "ville", "commune", "quartier",
