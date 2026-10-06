@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../core/services/connexion_service.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/models/property_model.dart';
@@ -236,6 +237,8 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
 
   Future<void> _demanderVisite(PropertyModel bien) async {
     if (_exigerConnexion()) return;
+    if (!await ConnexionService.instance.exigerConnexion(context)) return;
+    if (!mounted) return;
     final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
     if (utilisateur == null) return;
 

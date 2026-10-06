@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/connexion_service.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/equipements.dart';
 import '../../../core/models/property_model.dart';
@@ -266,6 +267,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       );
       return;
     }
+    if (!await ConnexionService.instance.exigerConnexion(context)) return;
+    if (!mounted) return;
 
     final nomProprietaireManquant =
         u?.role == UserRole.agent && _nomProprietaireCtrl.text.trim().isEmpty;

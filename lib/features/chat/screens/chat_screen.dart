@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/connexion_service.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/models/message_model.dart';
 import '../../../core/services/firestore_service.dart';
@@ -42,6 +43,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _envoyerMessage() async {
     if (_messageCtrl.text.trim().isEmpty) return;
+    if (!await ConnexionService.instance.exigerConnexion(context)) return;
+    if (!mounted) return;
 
     final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
     if (utilisateur == null) return;

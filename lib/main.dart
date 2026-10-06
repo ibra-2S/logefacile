@@ -9,9 +9,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 
+import 'core/services/connexion_service.dart';
 import 'core/services/firestore_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/rappel_service.dart';
+import 'core/widgets/bandeau_hors_ligne.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'firebase_options.dart';
 import 'router/app_router.dart';
@@ -42,6 +44,7 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(_messageArrierePlan);
   await NotificationService.instance.initialiser();
   await RappelService.initialiser();
+  ConnexionService.instance.demarrer();
 
   runApp(
     // ProviderScope nécessaire pour Riverpod
@@ -135,6 +138,9 @@ class _LogeFacileState extends ConsumerState<LogeFacile> {
         fontFamily: 'Poppins',
       ),
       routerConfig: routeur,
+      // bandeau « Pas de connexion Internet » au-dessus de tous les écrans
+      builder: (context, child) =>
+          BandeauHorsLigne(child: child ?? const SizedBox.shrink()),
     );
   }
 }

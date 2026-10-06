@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/connexion_service.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class ContactScreen extends ConsumerStatefulWidget {
@@ -49,6 +50,8 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
       );
       return;
     }
+    if (!await ConnexionService.instance.exigerConnexion(context)) return;
+    if (!mounted) return;
     final utilisateur = ref.read(utilisateurActuelProvider).asData?.value;
     setState(() => _envoi = true);
     try {
