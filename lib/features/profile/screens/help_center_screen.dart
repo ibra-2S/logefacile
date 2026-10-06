@@ -101,7 +101,8 @@ class HelpCenterScreen extends ConsumerWidget {
       'Comment répondre aux locataires ?',
       "Onglet « Messages ». Le badge indique les conversations non lues. "
           "Vous pouvez aussi être contacté(e) via WhatsApp si votre numéro "
-          "est renseigné dans le profil.",
+          "est renseigné et que l'option « Être contacté sur WhatsApp » est "
+          "activée (Profil > Modifier le profil).",
     ],
     [
       'Comment suivre les performances de mes biens ?',

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/models/user_model.dart';
+import '../../../core/widgets/whatsapp_logo.dart';
 import '../providers/auth_provider.dart';
 
 const _bleuFonce = Color(0xFF1A237E);
@@ -58,6 +59,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _erreur;
   int _etape = 0;
   late UserRole _role;
+  // propriétaire / agent : accepte d'être contacté sur WhatsApp
+  bool _accepteWhatsApp = true;
   _Pays _paysSel = _paysListe.first;
 
   static const _titresEtapes = ['Identité', 'Connexion', 'Confirmation'];
@@ -262,6 +265,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             nomComplet: _nomCtrl.text.trim(),
             role: _role,
             telephone: _telephoneComplet(),
+            accepteWhatsApp: _proOuAgent && _accepteWhatsApp,
           );
 
       if (!mounted) return;
@@ -402,8 +406,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       margin: EdgeInsets.only(right: i == 2 ? 0 : 6),
                       height: 5,
                       decoration: BoxDecoration(
-                        color:
-                            i <= _etape ? Colors.white : Colors.white24,
+                        color: i <= _etape ? Colors.white : Colors.white24,
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -509,9 +512,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                       ),
                                     )
                                     : Text(
-                                      dernier
-                                          ? 'Créer mon compte'
-                                          : 'Suivant',
+                                      dernier ? 'Créer mon compte' : 'Suivant',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 15,
@@ -635,6 +636,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               '${_paysSel.nom} · ${_formatLongueur()} attendus, sans l\'indicatif',
               style: const TextStyle(fontSize: 11, color: Colors.black45),
             ),
+            if (_proOuAgent) ...[const SizedBox(height: 14), _choixWhatsApp()],
           ],
         );
       case 1:
@@ -674,8 +676,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
                   ),
-                  onPressed:
-                      () => setState(() => _mdpVisible = !_mdpVisible),
+                  onPressed: () => setState(() => _mdpVisible = !_mdpVisible),
                 ),
               ),
             ),
@@ -708,6 +709,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ? 'Non renseigné'
                   : '${_paysSel.drapeau} ${_telephoneComplet()}',
             ),
+            if (_proOuAgent)
+              _recap(
+                'WhatsApp',
+                !_accepteWhatsApp
+                    ? 'Non'
+                    : _telCtrl.text.trim().isEmpty
+                    ? 'Oui (ajoutez un numéro pour être joignable)'
+                    : 'Oui, sur ce numéro',
+              ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
@@ -724,6 +734,49 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ],
         );
     }
+  }
+
+  bool get _proOuAgent =>
+      _role == UserRole.proprietaire || _role == UserRole.agent;
+
+  /// Question posée aux propriétaires / agents : les locataires peuvent-ils
+  /// les contacter sur WhatsApp (bouton sur leurs annonces) ?
+  Widget _choixWhatsApp() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+      decoration: BoxDecoration(
+        color: WhatsAppLogo.vert.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const WhatsAppLogo(size: 26),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Être contacté sur WhatsApp ?',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Les locataires verront un bouton WhatsApp sur vos '
+                  'annonces. Modifiable plus tard dans votre profil.',
+                  style: TextStyle(fontSize: 11, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _accepteWhatsApp,
+            activeTrackColor: WhatsAppLogo.vert,
+            onChanged: (v) => setState(() => _accepteWhatsApp = v),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _recap(String label, String valeur) {
@@ -761,10 +814,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         text: texte,
         children: [
           if (obligatoire)
-            const TextSpan(
-              text: ' *',
-              style: TextStyle(color: Colors.red),
-            ),
+            const TextSpan(text: ' *', style: TextStyle(color: Colors.red)),
         ],
       ),
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),

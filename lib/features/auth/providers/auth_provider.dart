@@ -26,6 +26,7 @@ class AuthNotifier extends Notifier<AsyncValue<UserModel?>> {
     required String nomComplet,
     required UserRole role,
     String? telephone,
+    bool accepteWhatsApp = true,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -37,6 +38,7 @@ class AuthNotifier extends Notifier<AsyncValue<UserModel?>> {
             nomComplet: nomComplet,
             role: role,
             telephone: telephone,
+            accepteWhatsApp: accepteWhatsApp,
           );
       state = AsyncValue.data(utilisateur);
     } catch (e, st) {

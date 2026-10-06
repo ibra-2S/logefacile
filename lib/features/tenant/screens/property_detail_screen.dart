@@ -149,9 +149,17 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
         'nomComplet': doc.data()?['nomComplet'] ?? '',
         'photoUrl': doc.data()?['photoUrl'] ?? '',
         'telephone': doc.data()?['telephone'] ?? '',
+        // absent sur les anciens comptes : WhatsApp autorisé par défaut
+        'accepteWhatsApp':
+            (doc.data()?['accepteWhatsApp'] ?? true) ? 'oui' : 'non',
       };
     }
-    return {'nomComplet': '', 'photoUrl': '', 'telephone': ''};
+    return {
+      'nomComplet': '',
+      'photoUrl': '',
+      'telephone': '',
+      'accepteWhatsApp': 'non',
+    };
   }
 
   String _messageWhatsApp(PropertyModel bien) =>
@@ -177,7 +185,8 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     if (_exigerConnexion()) return;
     final infos = await _obtenirInfosProprietaire(bien.proprietaireId);
     final telephone = infos['telephone'] ?? '';
-    final aWhatsApp = ContactService.aUnNumero(telephone);
+    final refuseWhatsApp = infos['accepteWhatsApp'] == 'non';
+    final aWhatsApp = !refuseWhatsApp && ContactService.aUnNumero(telephone);
     if (!mounted) return;
 
     await showModalBottomSheet<void>(
@@ -220,7 +229,11 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
               title: const Text('Contacter sur WhatsApp'),
               subtitle: aWhatsApp
                   ? null
-                  : const Text('Numéro non renseigné par ce contact'),
+                  : Text(
+                      refuseWhatsApp
+                          ? "Ce contact préfère les messages dans l'app"
+                          : 'Numéro non renseigné par ce contact',
+                    ),
               onTap: aWhatsApp
                   ? () {
                       Navigator.pop(ctx);
@@ -1386,7 +1399,8 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                       ],
                     ),
                   ],
-                  if (ContactService.aUnNumero(proprio.telephone)) ...[
+                  if (proprio.accepteWhatsApp &&
+                      ContactService.aUnNumero(proprio.telephone)) ...[
                     const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,

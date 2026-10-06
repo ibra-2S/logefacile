@@ -10,6 +10,10 @@ class UserModel {
   final String? photoUrl;
   final UserRole role;
   final String? telephone;
+
+  /// le propriétaire / agent accepte d'être contacté sur WhatsApp
+  /// (absent sur les anciens comptes : on garde le comportement d'avant)
+  final bool accepteWhatsApp;
   final bool estVerifie;
   final bool estActif;
   final DateTime dateCreation;
@@ -33,6 +37,7 @@ class UserModel {
     this.photoUrl,
     required this.role,
     this.telephone,
+    this.accepteWhatsApp = true,
     this.estVerifie = false,
     this.estActif = true,
     required this.dateCreation,
@@ -68,6 +73,7 @@ class UserModel {
         orElse: () => UserRole.locataire,
       ),
       telephone: d['telephone'],
+      accepteWhatsApp: d['accepteWhatsApp'] ?? true,
       estVerifie: d['estVerifie'] ?? false,
       estActif: d['estActif'] ?? true,
       dateCreation: _lireDate(d['dateCreation']),
@@ -91,6 +97,7 @@ class UserModel {
       'photoUrl': photoUrl,
       'role': role.name,
       'telephone': telephone,
+      'accepteWhatsApp': accepteWhatsApp,
       'estVerifie': estVerifie,
       'estActif': estActif,
       'dateCreation': Timestamp.fromDate(dateCreation),

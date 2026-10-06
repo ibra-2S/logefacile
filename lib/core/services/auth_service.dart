@@ -22,6 +22,7 @@ class AuthService {
     required String nomComplet,
     required UserRole role,
     String? telephone,
+    bool accepteWhatsApp = true,
   }) async {
     try {
       final resultat = await _auth.createUserWithEmailAndPassword(
@@ -38,6 +39,7 @@ class AuthService {
         nomComplet: nomComplet,
         role: role,
         telephone: telephone,
+        accepteWhatsApp: accepteWhatsApp,
         dateCreation: DateTime.now(),
         derniereCo: DateTime.now(),
       );

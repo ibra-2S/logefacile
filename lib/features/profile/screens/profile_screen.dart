@@ -10,6 +10,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/cloudinary_service.dart';
+import '../../../core/widgets/whatsapp_logo.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -93,9 +94,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _uploadPhoto = true);
 
     try {
-      final photoUrl = await CloudinaryService.uploaderImage(
-        File(image.path),
-      );
+      final photoUrl = await CloudinaryService.uploaderImage(File(image.path));
       if (photoUrl != null) {
         await FirebaseFirestore.instance
             .collection('users')
@@ -412,7 +411,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _lignePiece(UserModel utilisateur) {
-    final aUnePiece = utilisateur.carteIdentiteUrl != null &&
+    final aUnePiece =
+        utilisateur.carteIdentiteUrl != null &&
         utilisateur.carteIdentiteUrl!.isNotEmpty;
     final statut =
         utilisateur.carteVerifiee
@@ -443,10 +443,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 children: [
                   const Text(
                     "Pièce d'identité",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.texteLeger,
-                    ),
+                    style: TextStyle(fontSize: 12, color: AppColors.texteLeger),
                   ),
                   Text(
                     aUnePiece
@@ -668,6 +665,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   ) {
     final nomCtrl = TextEditingController(text: utilisateur.nomComplet);
     final telCtrl = TextEditingController(text: utilisateur.telephone ?? '');
+    var accepteWhatsApp = utilisateur.accepteWhatsApp;
 
     showModalBottomSheet(
       context: context,
@@ -716,6 +714,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ),
                 ),
+                if (utilisateur.estProprietaireOuAgent) ...[
+                  const SizedBox(height: 8),
+                  StatefulBuilder(
+                    builder:
+                        (context, setLocal) => SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          secondary: const WhatsAppLogo(size: 26),
+                          title: const Text('Être contacté sur WhatsApp'),
+                          subtitle: const Text(
+                            'Affiche un bouton WhatsApp sur vos annonces',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          value: accepteWhatsApp,
+                          activeTrackColor: WhatsAppLogo.vert,
+                          onChanged: (v) => setLocal(() => accepteWhatsApp = v),
+                        ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -727,6 +743,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           .update({
                             'nomComplet': nomCtrl.text.trim(),
                             'telephone': telCtrl.text.trim(),
+                            if (utilisateur.estProprietaireOuAgent)
+                              'accepteWhatsApp': accepteWhatsApp,
                           });
                       if (context.mounted) {
                         Navigator.pop(context);
