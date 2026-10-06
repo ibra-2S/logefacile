@@ -19,6 +19,7 @@ class PropertyModel {
   final int? nombreChambres;
   final int? nombreToilettes;
   final int? nombreCuisines;
+  final int? nombreSalons; // 0 = pas de salon, null = non renseigné
   final String adresse;
   final String ville;
   final String? commune;
@@ -54,6 +55,7 @@ class PropertyModel {
     this.nombreChambres,
     this.nombreToilettes,
     this.nombreCuisines,
+    this.nombreSalons,
     required this.adresse,
     required this.ville,
     this.commune,
@@ -118,6 +120,7 @@ class PropertyModel {
       nombreChambres: d['nombreChambres'],
       nombreToilettes: d['nombreToilettes'],
       nombreCuisines: d['nombreCuisines'],
+      nombreSalons: d['nombreSalons'],
       adresse: d['adresse'] ?? '',
       ville: d['ville'] ?? '',
       commune: d['commune'],
@@ -159,6 +162,7 @@ class PropertyModel {
       'nombreChambres': nombreChambres,
       'nombreToilettes': nombreToilettes,
       'nombreCuisines': nombreCuisines,
+      'nombreSalons': nombreSalons,
       'adresse': adresse,
       'ville': ville,
       'commune': commune,

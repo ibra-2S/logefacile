@@ -88,9 +88,9 @@ const confidentialiteSections = <LegalSection>[
     corps:
         "• Informations de compte : nom, adresse e-mail, numéro de téléphone.\n"
         "• Contenu que vous publiez : annonces, photos, messages.\n"
-        "• Données techniques : type d'appareil, journaux d'erreurs.\n"
-        "• Localisation approximative, uniquement lorsque vous ajoutez la "
-        "position d'un bien.",
+        "• Données techniques : identifiant de notification de l'appareil.\n"
+        "• Position précise de l'appareil, uniquement lorsque vous ajoutez "
+        "la position d'un bien. Elle n'est pas collectée en arrière-plan.",
   ),
   LegalSection(
     titre: 'Utilisation des données',

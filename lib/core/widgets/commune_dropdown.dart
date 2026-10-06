@@ -28,8 +28,13 @@ class CommuneDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Commune *',
+        Text.rich(
+          const TextSpan(
+            text: 'Commune',
+            children: [
+              TextSpan(text: ' *', style: TextStyle(color: AppColors.erreur)),
+            ],
+          ),
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: labelFontSize,

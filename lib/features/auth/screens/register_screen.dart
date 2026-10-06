@@ -290,7 +290,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Un email de confirmation a été envoyé à ${_emailCtrl.text.trim()}.\n\n⚠️ Vous devez cliquer sur le lien dans cet email AVANT de pouvoir vous connecter.\n\nVérifiez aussi vos spams !',
+                    'Un email de confirmation a été envoyé à ${_emailCtrl.text.trim()}.\n\nVous devez cliquer sur le lien dans cet email AVANT de pouvoir vous connecter.\n\nVérifiez aussi vos spams !',
                     style: const TextStyle(fontSize: 14, color: Colors.black54),
                     textAlign: TextAlign.center,
                   ),
@@ -329,13 +329,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _titreRole() {
     switch (_role) {
       case UserRole.proprietaire:
-        return '🏠 Compte Propriétaire';
+        return 'Compte Propriétaire';
       case UserRole.agent:
-        return '🤝 Compte Agent';
+        return 'Compte Agent';
       case UserRole.locataire:
-        return '🔍 Compte Locataire';
+        return 'Compte Locataire';
       case UserRole.admin:
-        return '🛡️ Compte Admin';
+        return 'Compte Admin';
+    }
+  }
+
+  IconData _iconeRole() {
+    switch (_role) {
+      case UserRole.proprietaire:
+        return Icons.home_outlined;
+      case UserRole.agent:
+        return Icons.handshake_outlined;
+      case UserRole.locataire:
+        return Icons.person_search_outlined;
+      case UserRole.admin:
+        return Icons.admin_panel_settings_outlined;
     }
   }
 
@@ -360,13 +373,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 6),
-              Text(
-                _titreRole(),
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+              Row(
+                children: [
+                  Icon(_iconeRole(), color: Colors.white, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    _titreRole(),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 4),
               Text(
@@ -551,13 +570,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               'Comment devons-nous vous appeler ?',
               style: TextStyle(fontSize: 13, color: Colors.black54),
             ),
-            const SizedBox(height: 18),
-            _champ('Nom complet *', 'Votre nom et prénom', _nomCtrl),
+            const SizedBox(height: 6),
+            _mentionObligatoire(),
             const SizedBox(height: 14),
-            const Text(
-              'Téléphone',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            _champ(
+              'Nom complet',
+              'Votre nom et prénom',
+              _nomCtrl,
+              obligatoire: true,
             ),
+            const SizedBox(height: 14),
+            _libelle('Téléphone'),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -628,18 +651,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               'Ils serviront à vous connecter.',
               style: TextStyle(fontSize: 13, color: Colors.black54),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 6),
+            _mentionObligatoire(),
+            const SizedBox(height: 14),
             _champ(
-              'Email *',
+              'Email',
               'exemple@email.com',
               _emailCtrl,
               type: TextInputType.emailAddress,
+              obligatoire: true,
             ),
             const SizedBox(height: 14),
-            const Text(
-              'Mot de passe *',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
+            _libelle('Mot de passe', obligatoire: true),
             const SizedBox(height: 6),
             TextField(
               controller: _mdpCtrl,
@@ -657,10 +680,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
-              'Confirmer le mot de passe *',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
+            _libelle('Confirmer le mot de passe', obligatoire: true),
             const SizedBox(height: 6),
             TextField(
               controller: _confirmMdpCtrl,
@@ -734,19 +754,47 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
+  /// libellé d'un champ ; une étoile rouge signale les champs obligatoires
+  Widget _libelle(String texte, {bool obligatoire = false}) {
+    return Text.rich(
+      TextSpan(
+        text: texte,
+        children: [
+          if (obligatoire)
+            const TextSpan(
+              text: ' *',
+              style: TextStyle(color: Colors.red),
+            ),
+        ],
+      ),
+      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+    );
+  }
+
+  /// rappel placé sous l'intro de chaque étape du formulaire
+  Widget _mentionObligatoire() {
+    return const Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '*', style: TextStyle(color: Colors.red)),
+          TextSpan(text: ' Champs obligatoires'),
+        ],
+      ),
+      style: TextStyle(fontSize: 11, color: Colors.black45),
+    );
+  }
+
   Widget _champ(
     String label,
     String hint,
     TextEditingController ctrl, {
     TextInputType type = TextInputType.text,
+    bool obligatoire = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
+        _libelle(label, obligatoire: obligatoire),
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,

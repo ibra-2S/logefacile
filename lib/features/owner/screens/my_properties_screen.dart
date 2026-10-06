@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -274,6 +275,9 @@ class _CarteBien extends StatelessWidget {
     final cuisinesCtrl = TextEditingController(
       text: bien.nombreCuisines?.toString() ?? '',
     );
+    final salonsCtrl = TextEditingController(
+      text: bien.nombreSalons?.toString() ?? '',
+    );
     final villeCtrl = TextEditingController(text: bien.ville);
     final adresseCtrl = TextEditingController(text: bien.adresse);
     final quartierCtrl = TextEditingController(text: bien.quartier ?? '');
@@ -293,6 +297,125 @@ class _CarteBien extends StatelessWidget {
     bool avecFraisAgence = bien.fraisAgence != null;
     List<String> equipementsSelectionnes = List.from(bien.equipements);
 
+    // localisation GPS : un bien publié sans position a (0, 0) enregistré.
+    bool avecLocalisation =
+        bien.localisation.latitude != 0 || bien.localisation.longitude != 0;
+    GeoPoint? localisationChoisie = avecLocalisation ? bien.localisation : null;
+    bool localisationEnCours = false;
+
+    // Bornes géographiques approximatives du Grand Conakry (mêmes bornes
+    // que sur l'écran de publication).
+    const conakryLatMin = 9.45;
+    const conakryLatMax = 9.85;
+    const conakryLngMin = -13.85;
+    const conakryLngMax = -13.45;
+    bool dansConakry(double lat, double lng) =>
+        lat >= conakryLatMin &&
+        lat <= conakryLatMax &&
+        lng >= conakryLngMin &&
+        lng <= conakryLngMax;
+
+    Future<void> obtenirLocalisation(
+      BuildContext ctx,
+      StateSetter setStateModal,
+    ) async {
+      setStateModal(() => localisationEnCours = true);
+      try {
+        final serviceActif = await Geolocator.isLocationServiceEnabled();
+        if (!serviceActif) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(
+                content: Text('Activez le GPS sur votre téléphone'),
+                backgroundColor: AppColors.avertissement,
+              ),
+            );
+          }
+          setStateModal(() => localisationEnCours = false);
+          return;
+        }
+
+        var permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied) {
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(
+                  content: Text('Permission de localisation refusée'),
+                  backgroundColor: AppColors.erreur,
+                ),
+              );
+            }
+            setStateModal(() => localisationEnCours = false);
+            return;
+          }
+        }
+
+        if (permission == LocationPermission.deniedForever) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Permission refusée définitivement. Activez-la dans les paramètres.',
+                ),
+                backgroundColor: AppColors.erreur,
+              ),
+            );
+          }
+          setStateModal(() => localisationEnCours = false);
+          return;
+        }
+
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+
+        if (!dansConakry(position.latitude, position.longitude)) {
+          setStateModal(() => localisationEnCours = false);
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Votre position actuelle est hors de Conakry. '
+                  'La localisation GPS ne peut être enregistrée que depuis Conakry.',
+                ),
+                backgroundColor: AppColors.erreur,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
+
+        setStateModal(() {
+          localisationChoisie = GeoPoint(position.latitude, position.longitude);
+          localisationEnCours = false;
+        });
+
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Position enregistrée avec succès !'),
+              backgroundColor: AppColors.succes,
+            ),
+          );
+        }
+      } catch (e) {
+        setStateModal(() => localisationEnCours = false);
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur lors de la localisation. Réessayez.'),
+              backgroundColor: AppColors.erreur,
+            ),
+          );
+        }
+      }
+    }
+
     // photos : celles déjà en ligne (URLs) + celles ajoutées localement
     // (fichiers, pas encore téléversées)
     final photosExistantes = List<String>.from(bien.photos);
@@ -302,10 +425,16 @@ class _CarteBien extends StatelessWidget {
 
     final equipements = equipementsDisponibles;
     final labels = {
-      TypeBien.maison: '🏠 Maison',
-      TypeBien.appartement: '🏢 Appartement',
-      TypeBien.chambre: '🛏️ Chambre',
-      TypeBien.studio: '🪟 Studio',
+      TypeBien.maison: 'Maison',
+      TypeBien.appartement: 'Appartement',
+      TypeBien.chambre: 'Chambre',
+      TypeBien.studio: 'Studio',
+    };
+    final icones = {
+      TypeBien.maison: Icons.home_outlined,
+      TypeBien.appartement: Icons.apartment_outlined,
+      TypeBien.chambre: Icons.bed_outlined,
+      TypeBien.studio: Icons.weekend_outlined,
     };
 
     showModalBottomSheet(
@@ -347,10 +476,25 @@ class _CarteBien extends StatelessWidget {
                             ),
                           ],
                         ),
+                        const Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: AppColors.erreur),
+                              ),
+                              TextSpan(text: ' Champs obligatoires'),
+                            ],
+                          ),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondaire,
+                          ),
+                        ),
                         const SizedBox(height: 16),
 
                         // ── TYPE ──
-                        _titreSectionn('Type de bien'),
+                        _titreSectionn('Type de bien', obligatoire: true),
                         const SizedBox(height: 8),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -383,15 +527,29 @@ class _CarteBien extends StatelessWidget {
                                                   : AppColors.grisClair,
                                         ),
                                       ),
-                                      child: Text(
-                                        labels[type]!,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color:
-                                              estSelectionne
-                                                  ? Colors.white
-                                                  : AppColors.texte,
-                                        ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            icones[type],
+                                            size: 15,
+                                            color:
+                                                estSelectionne
+                                                    ? Colors.white
+                                                    : AppColors.texte,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            labels[type]!,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color:
+                                                  estSelectionne
+                                                      ? Colors.white
+                                                      : AppColors.texte,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
@@ -564,6 +722,7 @@ class _CarteBien extends StatelessWidget {
                           _champEdition(
                             'Nom du propriétaire',
                             nomProprietaireCtrl,
+                            obligatoire: true,
                           ),
                           const SizedBox(height: 12),
                         ],
@@ -571,7 +730,7 @@ class _CarteBien extends StatelessWidget {
                         // ── INFORMATIONS GÉNÉRALES ──
                         _titreSectionn('Informations générales'),
                         const SizedBox(height: 8),
-                        _champEdition('Titre *', titreCtrl),
+                        _champEdition('Titre', titreCtrl, obligatoire: true),
                         const SizedBox(height: 12),
                         _champEdition('Description', descCtrl, lignes: 3),
                         const SizedBox(height: 16),
@@ -579,7 +738,7 @@ class _CarteBien extends StatelessWidget {
                         // ── LOCALISATION ──
                         _titreSectionn('Localisation'),
                         const SizedBox(height: 8),
-                        _champEdition('Ville *', villeCtrl),
+                        _champEdition('Ville', villeCtrl, obligatoire: true),
                         const SizedBox(height: 12),
                         CommuneDropdown(
                           valeur: communeSelectionnee,
@@ -592,7 +751,137 @@ class _CarteBien extends StatelessWidget {
                         const SizedBox(height: 12),
                         _champEdition('Quartier', quartierCtrl),
                         const SizedBox(height: 12),
-                        _champEdition('Adresse *', adresseCtrl),
+                        _champEdition('Adresse', adresseCtrl, obligatoire: true),
+                        const SizedBox(height: 16),
+                        _carteConditionModal(
+                          titre: 'Ajouter la localisation exacte',
+                          icone: Icons.location_on_outlined,
+                          active: avecLocalisation,
+                          onChanged: (val) {
+                            setStateModal(() {
+                              avecLocalisation = val;
+                              if (!val) localisationChoisie = null;
+                            });
+                          },
+                          contenu:
+                              avecLocalisation
+                                  ? Padding(
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Vous devez être physiquement sur '
+                                          'place, sur le lieu du bien, au '
+                                          'moment de l\'enregistrer.',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondaire,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        GestureDetector(
+                                          onTap:
+                                              localisationEnCours
+                                                  ? null
+                                                  : () => obtenirLocalisation(
+                                                    ctx,
+                                                    setStateModal,
+                                                  ),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  localisationChoisie != null
+                                                      ? AppColors.succes
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          )
+                                                      : Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color:
+                                                    localisationChoisie != null
+                                                        ? AppColors.succes
+                                                        : AppColors.bleuFonce
+                                                            .withValues(
+                                                              alpha: 0.3,
+                                                            ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                localisationEnCours
+                                                    ? const SizedBox(
+                                                      width: 18,
+                                                      height: 18,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                          ),
+                                                    )
+                                                    : Icon(
+                                                      localisationChoisie !=
+                                                              null
+                                                          ? Icons.location_on
+                                                          : Icons
+                                                              .location_searching,
+                                                      color:
+                                                          localisationChoisie !=
+                                                                  null
+                                                              ? AppColors
+                                                                  .succes
+                                                              : AppColors
+                                                                  .bleuFonce,
+                                                      size: 20,
+                                                    ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text(
+                                                    localisationChoisie != null
+                                                        ? 'Lat: ${localisationChoisie!.latitude.toStringAsFixed(4)}, Lng: ${localisationChoisie!.longitude.toStringAsFixed(4)}'
+                                                        : 'Appuyez une fois sur place, à l\'adresse du bien',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          localisationChoisie !=
+                                                                  null
+                                                              ? AppColors
+                                                                  .succes
+                                                              : AppColors
+                                                                  .bleuFonce,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (localisationChoisie !=
+                                                    null)
+                                                  GestureDetector(
+                                                    onTap:
+                                                        () => setStateModal(
+                                                          () =>
+                                                              localisationChoisie =
+                                                                  null,
+                                                        ),
+                                                    child: const Icon(
+                                                      Icons.refresh,
+                                                      color: AppColors
+                                                          .textSecondaire,
+                                                      size: 16,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                  : null,
+                        ),
                         const SizedBox(height: 16),
 
                         // ── DÉTAILS ──
@@ -602,8 +891,9 @@ class _CarteBien extends StatelessWidget {
                           children: [
                             Expanded(
                               child: _champEdition(
-                                'Prix (GNF) *',
+                                'Prix (GNF)',
                                 prixCtrl,
+                                obligatoire: true,
                                 type: TextInputType.number,
                               ),
                             ),
@@ -628,25 +918,41 @@ class _CarteBien extends StatelessWidget {
                           children: [
                             Expanded(
                               child: _champEdition(
-                                '🛏️ Chambres',
+                                'Chambres',
                                 chambresCtrl,
                                 type: TextInputType.number,
+                                icone: Icons.bed_outlined,
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: _champEdition(
-                                '🚿 Toilettes',
+                                'Salons',
+                                salonsCtrl,
+                                type: TextInputType.number,
+                                icone: Icons.weekend_outlined,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _champEdition(
+                                'Toilettes',
                                 toilettesCtrl,
                                 type: TextInputType.number,
+                                icone: Icons.bathtub_outlined,
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: _champEdition(
-                                '🍳 Cuisines',
+                                'Cuisines',
                                 cuisinesCtrl,
                                 type: TextInputType.number,
+                                icone: Icons.kitchen_outlined,
                               ),
                             ),
                           ],
@@ -659,7 +965,8 @@ class _CarteBien extends StatelessWidget {
 
                         // caution
                         _carteConditionModal(
-                          titre: '🔒 Caution',
+                          titre: 'Caution',
+                          icone: Icons.security_outlined,
                           active: avecCaution,
                           onChanged:
                               (val) => setStateModal(() => avecCaution = val),
@@ -709,7 +1016,8 @@ class _CarteBien extends StatelessWidget {
 
                         // avance
                         _carteConditionModal(
-                          titre: '📅 Avance',
+                          titre: 'Avance',
+                          icone: Icons.calendar_month_outlined,
                           active: avecAvance,
                           onChanged:
                               (val) => setStateModal(() => avecAvance = val),
@@ -756,7 +1064,8 @@ class _CarteBien extends StatelessWidget {
                         if (estAgent) ...[
                           const SizedBox(height: 8),
                           _carteConditionModal(
-                            titre: '💼 Frais d\'agence',
+                            titre: 'Frais d\'agence',
+                            icone: Icons.badge_outlined,
                             active: avecFraisAgence,
                             onChanged:
                                 (val) =>
@@ -835,6 +1144,27 @@ class _CarteBien extends StatelessWidget {
                                 enregistrementEnCours
                                     ? null
                                     : () async {
+                                      final champManquant =
+                                          (estAgent &&
+                                              nomProprietaireCtrl.text
+                                                  .trim()
+                                                  .isEmpty) ||
+                                          titreCtrl.text.trim().isEmpty ||
+                                          villeCtrl.text.trim().isEmpty ||
+                                          communeSelectionnee == null ||
+                                          adresseCtrl.text.trim().isEmpty ||
+                                          prixCtrl.text.trim().isEmpty;
+                                      if (champManquant) {
+                                        ScaffoldMessenger.of(ctx).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Veuillez remplir tous les champs obligatoires.',
+                                            ),
+                                            backgroundColor: AppColors.erreur,
+                                          ),
+                                        );
+                                        return;
+                                      }
                                       setStateModal(
                                         () => enregistrementEnCours = true,
                                       );
@@ -871,6 +1201,9 @@ class _CarteBien extends StatelessWidget {
                                         'nombreCuisines': int.tryParse(
                                           cuisinesCtrl.text.trim(),
                                         ),
+                                        'nombreSalons': int.tryParse(
+                                          salonsCtrl.text.trim(),
+                                        ),
                                         'ville': villeCtrl.text.trim(),
                                         'commune': communeSelectionnee,
                                         'adresse': adresseCtrl.text.trim(),
@@ -878,6 +1211,13 @@ class _CarteBien extends StatelessWidget {
                                             quartierCtrl.text.trim().isEmpty
                                                 ? null
                                                 : quartierCtrl.text.trim(),
+                                        // (0, 0) = pas de position renseignée ;
+                                        // l'écran de détail se base sur ce
+                                        // couple pour décider d'afficher ou
+                                        // non la carte.
+                                        'localisation':
+                                            localisationChoisie ??
+                                                const GeoPoint(0, 0),
                                         'photos': photosFinales,
                                         'nomProprietaireReel':
                                             estAgent &&
@@ -967,9 +1307,9 @@ class _CarteBien extends StatelessWidget {
     );
   }
 
-  static Widget _titreSectionn(String titre) {
-    return Text(
-      titre,
+  static Widget _titreSectionn(String titre, {bool obligatoire = false}) {
+    return Text.rich(
+      TextSpan(text: titre, children: [if (obligatoire) _etoile]),
       style: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w700,
@@ -979,22 +1319,38 @@ class _CarteBien extends StatelessWidget {
   }
 
 
+  /// étoile rouge qui signale un champ obligatoire
+  static const _etoile = TextSpan(
+    text: ' *',
+    style: TextStyle(color: AppColors.erreur),
+  );
+
   static Widget _champEdition(
     String label,
     TextEditingController ctrl, {
     int lignes = 1,
     TextInputType type = TextInputType.text,
+    IconData? icone,
+    bool obligatoire = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-            color: AppColors.texte,
-          ),
+        Row(
+          children: [
+            if (icone != null) ...[
+              Icon(icone, size: 14, color: AppColors.textSecondaire),
+              const SizedBox(width: 5),
+            ],
+            Text.rich(
+              TextSpan(text: label, children: [if (obligatoire) _etoile]),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: AppColors.texte,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         TextField(
@@ -1022,6 +1378,7 @@ class _CarteBien extends StatelessWidget {
     required String titre,
     required bool active,
     required ValueChanged<bool> onChanged,
+    IconData? icone,
     Widget? contenu,
   }) {
     return Container(
@@ -1042,13 +1399,21 @@ class _CarteBien extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  titre,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.texte,
-                  ),
+                child: Row(
+                  children: [
+                    if (icone != null) ...[
+                      Icon(icone, size: 15, color: AppColors.bleuFonce),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      titre,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.texte,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Switch(

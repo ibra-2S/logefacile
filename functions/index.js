@@ -11,6 +11,7 @@
  */
 const {onDocumentCreated, onDocumentWritten} =
     require("firebase-functions/v2/firestore");
+const functionsV1 = require("firebase-functions/v1");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getMessaging} = require("firebase-admin/messaging");
@@ -32,7 +33,8 @@ initializeApp();
 const CHAMPS_PUBLICS = [
   "titre", "type", "statut", "prix", "ville", "commune", "quartier",
   "photos", "estDisponible", "nombreVues", "nombreChambres",
-  "nombrePieces", "nombreToilettes", "nombreCuisines", "surface",
+  "nombrePieces", "nombreToilettes", "nombreCuisines", "nombreSalons",
+  "surface",
   "datePublication", "dateMiseAJour",
 ];
 
@@ -164,5 +166,47 @@ exports.envoiPushNotification = onDocumentCreated(
           fcmTokens: FieldValue.arrayRemove(...invalides),
         });
       }
+    },
+);
+
+/**
+ * Suppression des données d'un utilisateur quand son compte Auth est
+ * supprimé (Paramètres > Supprimer mon compte, ou console Firebase).
+ *
+ * Exigence Play Store : la suppression de compte doit aussi effacer les
+ * données associées. Le client ne peut pas le faire lui-même (les règles
+ * l'empêchent de toucher aux conversations ou demandes d'autrui), d'où
+ * l'Admin SDK ici. Les biens supprimés disparaissent aussi de
+ * `properties_public` via miroirBienPublic. Les signalements (`reports`)
+ * sont volontairement conservés pour la modération.
+ */
+exports.nettoyerCompteSupprime = functionsV1.auth.user().onDelete(
+    async (user) => {
+      const db = getFirestore();
+      const uid = user.uid;
+
+      const requetes = [
+        db.collection("properties").where("proprietaireId", "==", uid),
+        db.collection("favorites").where("tenantId", "==", uid),
+        db.collection("visitRequests").where("locataireId", "==", uid),
+        db.collection("visitRequests").where("proprietaireId", "==", uid),
+        db.collection("searchAlerts").where("locataireId", "==", uid),
+        db.collection("notifications").where("destinataireId", "==", uid),
+        db.collection("reviews").where("locataireId", "==", uid),
+        db.collection("support_messages").where("uid", "==", uid),
+      ];
+      for (const requete of requetes) {
+        const snap = await requete.get();
+        await Promise.all(snap.docs.map((d) => d.ref.delete()));
+      }
+
+      // conversations + sous-collection messages
+      const convs = await db.collection("conversations")
+          .where("participants", "array-contains", uid).get();
+      for (const conv of convs.docs) {
+        await db.recursiveDelete(conv.ref);
+      }
+
+      await db.collection("users").doc(uid).delete();
     },
 );

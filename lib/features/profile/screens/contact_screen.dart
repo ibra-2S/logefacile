@@ -14,7 +14,7 @@ class ContactScreen extends ConsumerStatefulWidget {
 }
 
 class _ContactScreenState extends ConsumerState<ContactScreen> {
-  static const _email = 'support@logefacile.gn';
+  static const _email = 'logefacile.app@gmail.com';
   static const _telephone = '+224 620 00 00 00';
 
   final _messageCtrl = TextEditingController();

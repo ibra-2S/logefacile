@@ -36,7 +36,7 @@ class RoleSelectionScreen extends StatelessWidget {
 
               // carte propriétaire
               _CarteRole(
-                emoji: '🏠',
+                icone: Icons.home_outlined,
                 titre: 'Propriétaire',
                 description: 'Je publie et gère mes biens immobiliers',
                 couleur: const Color(0xFF2E7D32),
@@ -50,7 +50,7 @@ class RoleSelectionScreen extends StatelessWidget {
 
               // carte agent
               _CarteRole(
-                emoji: '🤝',
+                icone: Icons.handshake_outlined,
                 titre: 'Agent immobilier',
                 description:
                     'Je gère des biens pour le compte de propriétaires',
@@ -65,7 +65,7 @@ class RoleSelectionScreen extends StatelessWidget {
 
               // carte locataire
               _CarteRole(
-                emoji: '🔍',
+                icone: Icons.person_search_outlined,
                 titre: 'Locataire',
                 description: 'Je recherche un logement à louer',
                 couleur: const Color(0xFF00695C),
@@ -84,14 +84,14 @@ class RoleSelectionScreen extends StatelessWidget {
 }
 
 class _CarteRole extends StatelessWidget {
-  final String emoji;
+  final IconData icone;
   final String titre;
   final String description;
   final Color couleur;
   final VoidCallback onTap;
 
   const _CarteRole({
-    required this.emoji,
+    required this.icone,
     required this.titre,
     required this.description,
     required this.couleur,
@@ -119,7 +119,7 @@ class _CarteRole extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
-                child: Text(emoji, style: const TextStyle(fontSize: 28)),
+                child: Icon(icone, color: couleur, size: 28),
               ),
             ),
             const SizedBox(width: 16),

@@ -23,7 +23,8 @@ const db = admin.firestore();
 const CHAMPS_PUBLICS = [
   "titre", "type", "statut", "prix", "ville", "commune", "quartier",
   "photos", "estDisponible", "nombreVues", "nombreChambres",
-  "nombrePieces", "nombreToilettes", "nombreCuisines", "surface",
+  "nombrePieces", "nombreToilettes", "nombreCuisines", "nombreSalons",
+  "surface",
   "datePublication", "dateMiseAJour",
 ];
 

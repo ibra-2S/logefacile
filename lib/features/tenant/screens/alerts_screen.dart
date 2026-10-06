@@ -99,13 +99,23 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '🔔 Nouvelle alerte',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.texte,
-                    ),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.notifications_active_outlined,
+                        size: 18,
+                        color: AppColors.texte,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Nouvelle alerte',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.texte,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   const Text(
@@ -182,15 +192,29 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                                             : AppColors.grisClair,
                                   ),
                                 ),
-                                child: Text(
-                                  type.label,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color:
-                                        estSelectionne
-                                            ? Colors.white
-                                            : AppColors.texte,
-                                  ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      type.icone,
+                                      size: 15,
+                                      color:
+                                          estSelectionne
+                                              ? Colors.white
+                                              : AppColors.texte,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      type.label,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color:
+                                            estSelectionne
+                                                ? Colors.white
+                                                : AppColors.texte,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );
@@ -347,9 +371,10 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Text(
-                                  '🔔',
-                                  style: TextStyle(fontSize: 24),
+                                const Icon(
+                                  Icons.notifications_active_outlined,
+                                  size: 24,
+                                  color: AppColors.bleuFonce,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -498,13 +523,26 @@ enum TypeBienAlerte {
   String get label {
     switch (this) {
       case TypeBienAlerte.maison:
-        return '🏠 Maison';
+        return 'Maison';
       case TypeBienAlerte.appartement:
-        return '🏢 Appartement';
+        return 'Appartement';
       case TypeBienAlerte.chambre:
-        return '🛏️ Chambre';
+        return 'Chambre';
       case TypeBienAlerte.studio:
-        return '🪟 Studio';
+        return 'Studio';
+    }
+  }
+
+  IconData get icone {
+    switch (this) {
+      case TypeBienAlerte.maison:
+        return Icons.home_outlined;
+      case TypeBienAlerte.appartement:
+        return Icons.apartment_outlined;
+      case TypeBienAlerte.chambre:
+        return Icons.bed_outlined;
+      case TypeBienAlerte.studio:
+        return Icons.weekend_outlined;
     }
   }
 }

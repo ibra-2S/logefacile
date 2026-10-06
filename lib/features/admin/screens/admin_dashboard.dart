@@ -80,13 +80,23 @@ class AdminDashboard extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                '👑 Panneau Admin',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
+                              const Row(
+                                children: [
+                                  Icon(
+                                    Icons.admin_panel_settings_outlined,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Panneau Admin',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 6),
                               Text(
@@ -120,26 +130,26 @@ class AdminDashboard extends ConsumerWidget {
                           childAspectRatio: 1.4,
                           children: [
                             _CarteStatAdmin(
-                              emoji: '👤',
+                              icone: Icons.people_outline,
                               label: 'Utilisateurs',
                               valeur: '${users.length}',
                               couleur: AppColors.bleuFonce,
                             ),
                             _CarteStatAdmin(
-                              emoji: '🏠',
+                              icone: Icons.home_work_outlined,
                               label: 'Biens publiés',
                               valeur: '${biens.length}',
                               couleur: AppColors.vertProprietaire,
                             ),
                             _CarteStatAdmin(
-                              emoji: '✅',
+                              icone: Icons.check_circle_outline,
                               label: 'Biens disponibles',
                               valeur:
                                   '${biens.where((b) => b.estDisponible).length}',
                               couleur: AppColors.tealLocataire,
                             ),
                             _CarteStatAdmin(
-                              emoji: '🚨',
+                              icone: Icons.report_outlined,
                               label: 'Signalements',
                               valeur: '$signalementsEnAttente',
                               couleur: AppColors.erreur,
@@ -257,13 +267,13 @@ class AdminDashboard extends ConsumerWidget {
 }
 
 class _CarteStatAdmin extends StatelessWidget {
-  final String emoji;
+  final IconData icone;
   final String label;
   final String valeur;
   final Color couleur;
 
   const _CarteStatAdmin({
-    required this.emoji,
+    required this.icone,
     required this.label,
     required this.valeur,
     required this.couleur,
@@ -288,7 +298,7 @@ class _CarteStatAdmin extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 24)),
+          Icon(icone, color: couleur, size: 28),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

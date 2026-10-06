@@ -341,13 +341,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Text(
-              _labelRole(utilisateur.role.name),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: _couleurRole(utilisateur.role.name),
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _iconeRole(utilisateur.role.name),
+                  size: 14,
+                  color: _couleurRole(utilisateur.role.name),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  _labelRole(utilisateur.role.name),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _couleurRole(utilisateur.role.name),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -623,15 +634,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   String _labelRole(String role) {
     switch (role) {
       case 'proprietaire':
-        return '🏠 Propriétaire';
+        return 'Propriétaire';
       case 'agent':
-        return '🤝 Agent';
+        return 'Agent';
       case 'locataire':
-        return '🔍 Locataire';
+        return 'Locataire';
       case 'admin':
-        return '🛡️ Admin';
+        return 'Admin';
       default:
         return role;
+    }
+  }
+
+  IconData _iconeRole(String role) {
+    switch (role) {
+      case 'proprietaire':
+        return Icons.home_outlined;
+      case 'agent':
+        return Icons.handshake_outlined;
+      case 'locataire':
+        return Icons.person_search_outlined;
+      case 'admin':
+        return Icons.admin_panel_settings_outlined;
+      default:
+        return Icons.person_outline;
     }
   }
 

@@ -484,52 +484,22 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                     // ── DIAPORAMA PHOTOS ──
                     Stack(
                       children: [
-                        Hero(
-                          tag: 'bienPhoto_${bien.id}',
-                          flightShuttleBuilder: (
-                            ctx,
-                            anim,
-                            dir,
-                            fromCtx,
-                            toCtx,
-                          ) {
-                            return Container(
-                              color: AppColors.bleuClair,
-                              alignment: Alignment.center,
-                              child:
-                                  bien.photos.isEmpty
-                                      ? const Text(
-                                        '🏠',
-                                        style: TextStyle(fontSize: 60),
-                                      )
-                                      : Image.network(
-                                        _imageOptimisee(bien.photos.first),
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        errorBuilder:
-                                            (_, __, ___) => const Text(
-                                              '🏠',
-                                              style: TextStyle(fontSize: 60),
-                                            ),
+                        SizedBox(
+                          height: 300,
+                          width: double.infinity,
+                          child:
+                              bien.photos.isEmpty
+                                  ? Container(
+                                    color: AppColors.bleuClair,
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.home_work_outlined,
+                                        size: 80,
+                                        color: AppColors.bleuFonce,
                                       ),
-                            );
-                          },
-                          child: SizedBox(
-                            height: 300,
-                            width: double.infinity,
-                            child:
-                                bien.photos.isEmpty
-                                    ? Container(
-                                      color: AppColors.bleuClair,
-                                      child: const Center(
-                                        child: Text(
-                                          '🏠',
-                                          style: TextStyle(fontSize: 80),
-                                        ),
-                                      ),
-                                    )
-                                    : PageView.builder(
+                                    ),
+                                  )
+                                  : PageView.builder(
                                     controller: _pageController,
                                     itemCount: bien.photos.length,
                                     onPageChanged:
@@ -560,17 +530,15 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                                               (context, url, error) => Container(
                                                 color: AppColors.bleuClair,
                                                 child: const Center(
-                                                  child: Text(
-                                                    '🏠',
-                                                    style: TextStyle(
-                                                      fontSize: 48,
-                                                    ),
+                                                  child: Icon(
+                                                    Icons.home_work_outlined,
+                                                    size: 48,
+                                                    color: AppColors.bleuFonce,
                                                   ),
                                                 ),
                                               ),
                                         ),
                                   ),
-                          ),
                         ),
 
                         // indicateur points
@@ -739,20 +707,27 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               _statItem(
-                                '📐',
+                                Icons.square_foot_outlined,
                                 '${bien.surface?.toStringAsFixed(0) ?? '-'} m²',
                               ),
                               _statItem(
-                                '🚪',
+                                Icons.meeting_room_outlined,
                                 '${bien.nombrePieces ?? '-'} pièces',
                               ),
-                              _statItem('👁️', '${bien.nombreVues} vues'),
-                              _statItem('❤️', '${bien.nombreFavoris}'),
+                              _statItem(
+                                Icons.visibility_outlined,
+                                '${bien.nombreVues} vues',
+                              ),
+                              _statItem(
+                                Icons.favorite_outline,
+                                '${bien.nombreFavoris}',
+                              ),
                             ],
                           ),
 
                           // chambres / toilettes / cuisines
                           if (bien.nombreChambres != null ||
+                              bien.nombreSalons != null ||
                               bien.nombreToilettes != null ||
                               bien.nombreCuisines != null) ...[
                             const SizedBox(height: 12),
@@ -777,17 +752,24 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                                 children: [
                                   if (bien.nombreChambres != null)
                                     _statItem(
-                                      '🛏️',
+                                      Icons.bed_outlined,
                                       '${bien.nombreChambres} chambre${bien.nombreChambres! > 1 ? 's' : ''}',
+                                    ),
+                                  if (bien.nombreSalons != null)
+                                    _statItem(
+                                      Icons.weekend_outlined,
+                                      bien.nombreSalons == 0
+                                          ? 'Sans salon'
+                                          : '${bien.nombreSalons} salon${bien.nombreSalons! > 1 ? 's' : ''}',
                                     ),
                                   if (bien.nombreToilettes != null)
                                     _statItem(
-                                      '🚿',
+                                      Icons.bathtub_outlined,
                                       '${bien.nombreToilettes} toilette${bien.nombreToilettes! > 1 ? 's' : ''}',
                                     ),
                                   if (bien.nombreCuisines != null)
                                     _statItem(
-                                      '🍳',
+                                      Icons.kitchen_outlined,
                                       '${bien.nombreCuisines} cuisine${bien.nombreCuisines! > 1 ? 's' : ''}',
                                     ),
                                 ],
@@ -1022,16 +1004,18 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                           ],
 
                           // ── CARTE GOOGLE MAPS ──
-                          const Text(
-                            'Localisation',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.texte,
+                          // section entièrement masquée si le bailleur n'a
+                          // pas renseigné de position GPS pour ce bien.
+                          if (aUnePosition) ...[
+                            const Text(
+                              'Localisation',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.texte,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          if (aUnePosition)
+                            const SizedBox(height: 10),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(16),
                               child: SizedBox(
@@ -1054,24 +1038,9 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
                                   zoomGesturesEnabled: true,
                                 ),
                               ),
-                            )
-                          else
-                            Container(
-                              height: 90,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: AppColors.bleuClair,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Text(
-                                'Position GPS non renseignée pour cette annonce',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.bleuFonce,
-                                ),
-                              ),
                             ),
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 24),
+                          ],
 
                           // ── PRÉSENTATION DU PROPRIÉTAIRE ──
                           _sectionProprietaire(bien),
@@ -1484,10 +1453,10 @@ class _PropertyDetailScreenState extends ConsumerState<PropertyDetailScreen> {
     );
   }
 
-  Widget _statItem(String emoji, String valeur) {
+  Widget _statItem(IconData icone, String valeur) {
     return Column(
       children: [
-        Text(emoji, style: const TextStyle(fontSize: 24)),
+        Icon(icone, size: 24, color: AppColors.bleuFonce),
         const SizedBox(height: 4),
         Text(
           valeur,

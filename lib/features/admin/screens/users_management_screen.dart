@@ -52,10 +52,16 @@ class _UsersManagementScreenState extends ConsumerState<UsersManagementScreen>
           unselectedLabelColor: Colors.white60,
           isScrollable: true,
           tabs: const [
-            Tab(text: '🔍 Locataires'),
-            Tab(text: '🏠 Propriétaires'),
-            Tab(text: '🤝 Agents'),
-            Tab(text: '👑 Admins'),
+            Tab(
+              icon: Icon(Icons.person_search_outlined, size: 18),
+              text: 'Locataires',
+            ),
+            Tab(icon: Icon(Icons.home_outlined, size: 18), text: 'Propriétaires'),
+            Tab(icon: Icon(Icons.handshake_outlined, size: 18), text: 'Agents'),
+            Tab(
+              icon: Icon(Icons.admin_panel_settings_outlined, size: 18),
+              text: 'Admins',
+            ),
           ],
         ),
       ),

@@ -3,13 +3,13 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-/// Upload d'images vers Cloudinary (preset non signé), utilisé pour les
-/// photos de profil, les pièces d'identité et les photos de biens.
+// Upload d'images vers Cloudinary (preset non signé), utilisé pour les
+// photos de profil, les pièces d'identité et les photos de biens.
 class CloudinaryService {
   static const String _cloudName = 'dfxnwioow';
   static const String _uploadPreset = 'g1qqzyep';
 
-  /// Envoie une image et retourne son URL sécurisée, ou `null` en cas d'échec.
+  // Envoie une image et retourne son URL sécurisée, ou `null` en cas d'échec.
   static Future<String?> uploaderImage(File image) async {
     try {
       final request = http.MultipartRequest(

@@ -248,7 +248,7 @@ class OwnerDashboard extends ConsumerWidget {
                                 const SizedBox(height: 12),
                                 _carteAction(
                                   context,
-                                  emoji: '➕',
+                                  icone: Icons.add_home_outlined,
                                   titre: 'Publier un bien',
                                   description:
                                       utilisateur.compteEnAttenteValidation
@@ -277,7 +277,7 @@ class OwnerDashboard extends ConsumerWidget {
                                 const SizedBox(height: 10),
                                 _carteAction(
                                   context,
-                                  emoji: '🏠',
+                                  icone: Icons.home_work_outlined,
                                   titre: 'Mes biens',
                                   description: 'Gérer vos logements publiés',
                                   couleur: AppColors.bleuMoyen,
@@ -286,7 +286,7 @@ class OwnerDashboard extends ConsumerWidget {
                                 const SizedBox(height: 10),
                                 _carteAction(
                                   context,
-                                  emoji: '📅',
+                                  icone: Icons.event_available_outlined,
                                   titre: 'Demandes de visite',
                                   description:
                                       'Voir et gérer les demandes reçues',
@@ -300,7 +300,7 @@ class OwnerDashboard extends ConsumerWidget {
                                 const SizedBox(height: 10),
                                 _carteAction(
                                   context,
-                                  emoji: '💬',
+                                  icone: Icons.chat_bubble_outline,
                                   titre: 'Messages',
                                   description:
                                       'Vos conversations avec les locataires',
@@ -618,7 +618,7 @@ class OwnerDashboard extends ConsumerWidget {
 
   Widget _carteAction(
     BuildContext context, {
-    required String emoji,
+    required IconData icone,
     required String titre,
     required String description,
     required Color couleur,
@@ -650,7 +650,7 @@ class OwnerDashboard extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
-                child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                child: Icon(icone, color: couleur, size: 24),
               ),
             ),
             const SizedBox(width: 16),

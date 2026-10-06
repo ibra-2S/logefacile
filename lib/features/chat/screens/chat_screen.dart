@@ -279,17 +279,13 @@ class _BullMessage extends StatelessWidget {
                 // statut "Vu" ou "Envoyé" sur le dernier message
                 if (estMoi && afficherStatut) ...[
                   const SizedBox(width: 4),
-                  Text(
-                    message.estLu ? 'Vu' : '✓',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight:
-                          message.estLu ? FontWeight.w700 : FontWeight.normal,
-                      color:
-                          message.estLu
-                              ? Colors.greenAccent
-                              : Colors.white.withValues(alpha: 0.7),
-                    ),
+                  Icon(
+                    message.estLu ? Icons.done_all : Icons.done,
+                    size: 14,
+                    color:
+                        message.estLu
+                            ? Colors.greenAccent
+                            : Colors.white.withValues(alpha: 0.7),
                   ),
                 ],
               ],

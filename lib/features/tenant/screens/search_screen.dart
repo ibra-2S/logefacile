@@ -59,11 +59,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _prixMax != null ||
       _chambresMin != null;
 
-  static const _types = <Map<String, String>>[
-    {'valeur': 'maison', 'label': '🏠 Maison'},
-    {'valeur': 'appartement', 'label': '🏢 Appartement'},
-    {'valeur': 'chambre', 'label': '🛏️ Chambre'},
-    {'valeur': 'studio', 'label': '🪟 Studio'},
+  static const _types = <({String valeur, String label, IconData icone})>[
+    (valeur: 'maison', label: 'Maison', icone: Icons.home_outlined),
+    (
+      valeur: 'appartement',
+      label: 'Appartement',
+      icone: Icons.apartment_outlined,
+    ),
+    (valeur: 'chambre', label: 'Chambre', icone: Icons.bed_outlined),
+    (valeur: 'studio', label: 'Studio', icone: Icons.weekend_outlined),
   ];
 
   @override
@@ -220,9 +224,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             ),
                             ..._types.map(
                               (t) => _chip(
-                                t['label']!,
-                                typeTemp == t['valeur'],
-                                () => setSheet(() => typeTemp = t['valeur']),
+                                t.label,
+                                typeTemp == t.valeur,
+                                () => setSheet(() => typeTemp = t.valeur),
+                                icone: t.icone,
                               ),
                             ),
                           ],
@@ -361,7 +366,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ),
   );
 
-  Widget _chip(String texte, bool actif, VoidCallback onTap) {
+  Widget _chip(
+    String texte,
+    bool actif,
+    VoidCallback onTap, {
+    IconData? icone,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -373,13 +383,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             color: actif ? AppColors.bleuFonce : AppColors.grisClair,
           ),
         ),
-        child: Text(
-          texte,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: actif ? Colors.white : AppColors.texte,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icone != null) ...[
+              Icon(
+                icone,
+                size: 15,
+                color: actif ? Colors.white : AppColors.texte,
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              texte,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: actif ? Colors.white : AppColors.texte,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -960,14 +983,11 @@ class _CarteBienGrille extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Hero(
-                tag: 'bienPhoto_${bien.id}',
-                child: PropertyPhoto(
-                  photos: bien.photos,
-                  height: double.infinity,
-                  width: double.infinity,
-                  borderRadius: BorderRadius.zero,
-                ),
+              PropertyPhoto(
+                photos: bien.photos,
+                height: double.infinity,
+                width: double.infinity,
+                borderRadius: BorderRadius.zero,
               ),
               const DecoratedBox(
                 decoration: BoxDecoration(
@@ -1123,13 +1143,23 @@ class _CarrouselVedettesState extends State<_CarrouselVedettes> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '🔥 En ce moment',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.texte,
-            ),
+          const Row(
+            children: [
+              Icon(
+                Icons.local_fire_department_outlined,
+                size: 17,
+                color: AppColors.texte,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'En ce moment',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.texte,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           SizedBox(

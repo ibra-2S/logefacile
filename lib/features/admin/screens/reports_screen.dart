@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/models/property_model.dart';
+import '../../../core/models/user_model.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/skeleton.dart';
+import '../widgets/fiche_bien_admin.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -148,7 +151,11 @@ class _CarteSignalement extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Text('🚨', style: TextStyle(fontSize: 18)),
+                  const Icon(
+                    Icons.report_problem_outlined,
+                    size: 18,
+                    color: AppColors.erreur,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     signalement['type'] ?? 'Signalement',
@@ -173,7 +180,7 @@ class _CarteSignalement extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  estTraite ? '✅ Traité' : '⏳ En attente',
+                  estTraite ? 'Traité' : 'En attente',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -205,43 +212,100 @@ class _CarteSignalement extends StatelessWidget {
 
           // infos supplémentaires
           if (signalement['bienId'] != null) ...[
-            Row(
-              children: [
-                const Icon(
-                  Icons.home_outlined,
-                  size: 14,
-                  color: AppColors.textSecondaire,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Bien : ${signalement['bienId'].toString().substring(0, 8)}...',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondaire,
+            FutureBuilder<PropertyModel?>(
+              future: firestoreService.recupererBien(signalement['bienId']),
+              builder: (context, snap) {
+                final chargement =
+                    snap.connectionState == ConnectionState.waiting;
+                final bien = snap.data;
+                return InkWell(
+                  onTap:
+                      bien == null
+                          ? null
+                          : () => ouvrirFicheBienAdmin(
+                            context,
+                            bien: bien,
+                            firestoreService: firestoreService,
+                          ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.home_outlined,
+                        size: 14,
+                        color: AppColors.textSecondaire,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          chargement
+                              ? 'Chargement de l\'annonce…'
+                              : bien == null
+                              ? 'Annonce introuvable (supprimée)'
+                              : 'Bien : ${bien.titre}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                bien == null
+                                    ? AppColors.textSecondaire
+                                    : AppColors.bleuFonce,
+                            fontWeight:
+                                bien == null
+                                    ? FontWeight.normal
+                                    : FontWeight.w600,
+                            decoration:
+                                bien == null
+                                    ? TextDecoration.none
+                                    : TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      if (bien != null)
+                        const Icon(
+                          Icons.chevron_right,
+                          size: 16,
+                          color: AppColors.textSecondaire,
+                        ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
             const SizedBox(height: 4),
           ],
 
           if (signalement['signalePar'] != null) ...[
-            Row(
-              children: [
-                const Icon(
-                  Icons.person_outline,
-                  size: 14,
-                  color: AppColors.textSecondaire,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Signalé par : ${signalement['signalePar'].toString().substring(0, 8)}...',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondaire,
-                  ),
-                ),
-              ],
+            FutureBuilder<UserModel?>(
+              future: firestoreService.utilisateurParId(
+                signalement['signalePar'],
+              ),
+              builder: (context, snap) {
+                final u = snap.data;
+                final texte =
+                    snap.connectionState == ConnectionState.waiting
+                        ? 'Chargement…'
+                        : (u == null
+                            ? 'Compte introuvable (supprimé)'
+                            : '${u.nomComplet} (${u.email})');
+                return Row(
+                  children: [
+                    const Icon(
+                      Icons.person_outline,
+                      size: 14,
+                      color: AppColors.textSecondaire,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Signalé par : $texte',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondaire,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 4),
           ],

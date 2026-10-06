@@ -348,19 +348,19 @@ class _CarteDemande extends StatelessWidget {
     switch (statut) {
       case StatutDemande.enAttente:
         couleur = AppColors.avertissement;
-        label = '⏳ En attente';
+        label = 'En attente';
         break;
       case StatutDemande.acceptee:
         couleur = AppColors.succes;
-        label = '✅ Acceptée';
+        label = 'Acceptée';
         break;
       case StatutDemande.refusee:
         couleur = AppColors.erreur;
-        label = '❌ Refusée';
+        label = 'Refusée';
         break;
       case StatutDemande.annulee:
         couleur = AppColors.grisMoyen;
-        label = '🚫 Annulée';
+        label = 'Annulée';
         break;
     }
     return Container(

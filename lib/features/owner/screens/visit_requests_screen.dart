@@ -303,7 +303,7 @@ class _CarteDemande extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: const Text('Demande acceptée ✅'),
+            title: const Text('Demande acceptée'),
             content: Text(
               'Voulez-vous ajouter la visite de « ${demande.titreBien} » à '
               'votre calendrier ? L\'application vous enverra aussi un rappel '
@@ -379,19 +379,19 @@ class _CarteDemande extends StatelessWidget {
     switch (statut) {
       case StatutDemande.enAttente:
         couleur = AppColors.avertissement;
-        label = '⏳ En attente';
+        label = 'En attente';
         break;
       case StatutDemande.acceptee:
         couleur = AppColors.succes;
-        label = '✅ Acceptée';
+        label = 'Acceptée';
         break;
       case StatutDemande.refusee:
         couleur = AppColors.erreur;
-        label = '❌ Refusée';
+        label = 'Refusée';
         break;
       case StatutDemande.annulee:
         couleur = AppColors.grisMoyen;
-        label = demande.etaitAcceptee ? '🚫 Visite annulée' : '🚫 Annulée';
+        label = demande.etaitAcceptee ? 'Visite annulée' : 'Annulée';
         break;
     }
     return Container(

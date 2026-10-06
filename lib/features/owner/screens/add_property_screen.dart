@@ -35,6 +35,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   final _chambresCtrl = TextEditingController();
   final _toilettesCtrl = TextEditingController();
   final _cuisinesCtrl = TextEditingController();
+  final _salonsCtrl = TextEditingController();
   final _nomProprietaireCtrl = TextEditingController();
   final _fraisAgenceCtrl = TextEditingController();
 
@@ -51,6 +52,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
   bool _avecFraisAgence = false;
 
   // localisation GPS
+  bool _avecLocalisation = false;
   GeoPoint? _localisation;
   bool _localisationEnCours = false;
 
@@ -96,9 +98,11 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
         _piecesCtrl.clear();
         _chambresCtrl.clear();
         _cuisinesCtrl.clear();
+        _salonsCtrl.clear();
       } else if (type == TypeBien.studio) {
         _piecesCtrl.clear();
         _chambresCtrl.clear();
+        _salonsCtrl.clear();
       }
     });
   }
@@ -121,6 +125,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     _chambresCtrl.dispose();
     _toilettesCtrl.dispose();
     _cuisinesCtrl.dispose();
+    _salonsCtrl.dispose();
     _nomProprietaireCtrl.dispose();
     _fraisAgenceCtrl.dispose();
     super.dispose();
@@ -202,7 +207,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Position enregistrée avec succès !'),
+            content: Text('Position enregistrée avec succès !'),
             backgroundColor: AppColors.succes,
           ),
         );
@@ -262,7 +267,10 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       return;
     }
 
-    if (_titreCtrl.text.trim().isEmpty ||
+    final nomProprietaireManquant =
+        u?.role == UserRole.agent && _nomProprietaireCtrl.text.trim().isEmpty;
+    if (nomProprietaireManquant ||
+        _titreCtrl.text.trim().isEmpty ||
         _adresseCtrl.text.trim().isEmpty ||
         _villeCtrl.text.trim().isEmpty ||
         _communeSelectionnee == null ||
@@ -323,6 +331,11 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             _typeSelectionne == TypeBien.chambre
                 ? null
                 : int.tryParse(_cuisinesCtrl.text.trim()),
+        nombreSalons:
+            _typeSelectionne == TypeBien.maison ||
+                    _typeSelectionne == TypeBien.appartement
+                ? int.tryParse(_salonsCtrl.text.trim())
+                : null,
         adresse: _adresseCtrl.text.trim(),
         ville: _villeCtrl.text.trim(),
         commune: _communeSelectionnee,
@@ -330,7 +343,9 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             _quartierCtrl.text.trim().isEmpty
                 ? null
                 : _quartierCtrl.text.trim(),
-        localisation: _localisation ?? const GeoPoint(9.5370, -13.6773),
+        // (0, 0) = pas de position renseignée ; l'écran de détail se base
+        // sur ce couple pour décider d'afficher ou non la carte.
+        localisation: _localisation ?? const GeoPoint(0, 0),
         equipements: _equipementsSelectionnes,
         photos: photosUrls,
         moisCaution: _avecCaution ? _moisCaution : null,
@@ -384,6 +399,20 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '*',
+                    style: TextStyle(color: AppColors.erreur),
+                  ),
+                  TextSpan(text: ' Champs obligatoires'),
+                ],
+              ),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondaire),
+            ),
+            const SizedBox(height: 14),
+
             // ── SECTION AGENT ──
             if (estAgent) ...[
               Container(
@@ -418,9 +447,10 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                     ),
                     const SizedBox(height: 10),
                     _champTexte(
-                      'Nom du propriétaire du bien *',
+                      'Nom du propriétaire du bien',
                       'Ex: Mamadou Diallo',
                       _nomProprietaireCtrl,
+                      obligatoire: true,
                     ),
                   ],
                 ),
@@ -429,7 +459,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             ],
 
             // ── TYPE DE BIEN ──
-            _titreSectionn('Type de bien *'),
+            _titreSectionn('Type de bien', obligatoire: true),
             const SizedBox(height: 10),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -438,10 +468,16 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                     TypeBien.values.map((type) {
                       final estSelectionne = type == _typeSelectionne;
                       final labels = {
-                        TypeBien.maison: '🏠 Maison',
-                        TypeBien.appartement: '🏢 Appartement',
-                        TypeBien.chambre: '🛏️ Chambre',
-                        TypeBien.studio: '🪟 Studio',
+                        TypeBien.maison: 'Maison',
+                        TypeBien.appartement: 'Appartement',
+                        TypeBien.chambre: 'Chambre',
+                        TypeBien.studio: 'Studio',
+                      };
+                      final icones = {
+                        TypeBien.maison: Icons.home_outlined,
+                        TypeBien.appartement: Icons.apartment_outlined,
+                        TypeBien.chambre: Icons.bed_outlined,
+                        TypeBien.studio: Icons.weekend_outlined,
                       };
                       return GestureDetector(
                         onTap: () => _selectionnerType(type),
@@ -464,16 +500,30 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                                       : AppColors.grisClair,
                             ),
                           ),
-                          child: Text(
-                            labels[type]!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color:
-                                  estSelectionne
-                                      ? Colors.white
-                                      : AppColors.texte,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                icones[type],
+                                size: 16,
+                                color:
+                                    estSelectionne
+                                        ? Colors.white
+                                        : AppColors.texte,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                labels[type]!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color:
+                                      estSelectionne
+                                          ? Colors.white
+                                          : AppColors.texte,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -614,9 +664,10 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             _titreSectionn('Informations générales'),
             const SizedBox(height: 10),
             _champTexte(
-              'Titre de l\'annonce *',
+              'Titre de l\'annonce',
               'Ex: Bel appartement à Kaloum',
               _titreCtrl,
+              obligatoire: true,
             ),
             const SizedBox(height: 12),
             _champTexte(
@@ -655,88 +706,122 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             ),
             const SizedBox(height: 12),
             _champTexte(
-              'Adresse complète *',
+              'Adresse complète',
               'Ex: Rue KA-045',
               _adresseCtrl,
+              obligatoire: true,
             ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: _localisationEnCours ? null : _obtenirLocalisation,
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color:
-                      _localisation != null
-                          ? AppColors.succes.withValues(alpha: 0.1)
-                          : AppColors.bleuClair,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color:
-                        _localisation != null
-                            ? AppColors.succes
-                            : AppColors.bleuFonce.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    _localisationEnCours
-                        ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                        : Icon(
-                          _localisation != null
-                              ? Icons.location_on
-                              : Icons.location_searching,
-                          color:
-                              _localisation != null
-                                  ? AppColors.succes
-                                  : AppColors.bleuFonce,
-                          size: 22,
-                        ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _localisation != null
-                                ? '✅ Position GPS enregistrée'
-                                : 'Enregistrer ma position GPS',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+            const SizedBox(height: 16),
+            _carteCondition(
+              titre: 'Ajouter la localisation exacte',
+              icone: Icons.location_on_outlined,
+              description:
+                  'Vous devez être physiquement sur place, sur le lieu du '
+                  'bien, au moment de l\'enregistrer.',
+              active: _avecLocalisation,
+              onChanged: (val) {
+                setState(() {
+                  _avecLocalisation = val;
+                  if (!val) _localisation = null;
+                });
+              },
+              contenu:
+                  _avecLocalisation
+                      ? Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: GestureDetector(
+                          onTap:
+                              _localisationEnCours
+                                  ? null
+                                  : _obtenirLocalisation,
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
                               color:
                                   _localisation != null
-                                      ? AppColors.succes
-                                      : AppColors.bleuFonce,
+                                      ? AppColors.succes.withValues(
+                                        alpha: 0.1,
+                                      )
+                                      : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color:
+                                    _localisation != null
+                                        ? AppColors.succes
+                                        : AppColors.bleuFonce.withValues(
+                                          alpha: 0.3,
+                                        ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                _localisationEnCours
+                                    ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : Icon(
+                                      _localisation != null
+                                          ? Icons.location_on
+                                          : Icons.location_searching,
+                                      color:
+                                          _localisation != null
+                                              ? AppColors.succes
+                                              : AppColors.bleuFonce,
+                                      size: 22,
+                                    ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _localisation != null
+                                            ? 'Position GPS enregistrée'
+                                            : 'Enregistrer ma position GPS',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color:
+                                              _localisation != null
+                                                  ? AppColors.succes
+                                                  : AppColors.bleuFonce,
+                                        ),
+                                      ),
+                                      Text(
+                                        _localisation != null
+                                            ? 'Lat: ${_localisation!.latitude.toStringAsFixed(4)}, Lng: ${_localisation!.longitude.toStringAsFixed(4)}'
+                                            : 'Appuyez une fois sur place, à l\'adresse du bien',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondaire,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (_localisation != null)
+                                  GestureDetector(
+                                    onTap:
+                                        () => setState(
+                                          () => _localisation = null,
+                                        ),
+                                    child: const Icon(
+                                      Icons.refresh,
+                                      color: AppColors.textSecondaire,
+                                      size: 18,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          Text(
-                            _localisation != null
-                                ? 'Lat: ${_localisation!.latitude.toStringAsFixed(4)}, Lng: ${_localisation!.longitude.toStringAsFixed(4)}'
-                                : 'Appuyez pour localiser le bien sur la carte',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondaire,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_localisation != null)
-                      GestureDetector(
-                        onTap: () => setState(() => _localisation = null),
-                        child: const Icon(
-                          Icons.refresh,
-                          color: AppColors.textSecondaire,
-                          size: 18,
                         ),
-                      ),
-                  ],
-                ),
-              ),
+                      )
+                      : null,
             ),
             const SizedBox(height: 20),
 
@@ -747,10 +832,11 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
               children: [
                 Expanded(
                   child: _champTexte(
-                    'Prix mensuel (GNF) *',
+                    'Prix mensuel (GNF)',
                     'Ex: 500000',
                     _prixCtrl,
                     type: TextInputType.number,
+                    obligatoire: true,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -790,7 +876,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
 
             // caution
             _carteCondition(
-              titre: '🔒 Caution',
+              titre: 'Caution',
+              icone: Icons.security_outlined,
               description: 'Demander une caution remboursable',
               active: _avecCaution,
               onChanged: (val) => setState(() => _avecCaution = val),
@@ -838,7 +925,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
 
             // avance
             _carteCondition(
-              titre: '📅 Avance',
+              titre: 'Avance',
+              icone: Icons.calendar_month_outlined,
               description: 'Demander un paiement en avance',
               active: _avecAvance,
               onChanged: (val) => setState(() => _avecAvance = val),
@@ -887,7 +975,8 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
             if (estAgent) ...[
               const SizedBox(height: 10),
               _carteCondition(
-                titre: '💼 Frais d\'agence',
+                titre: 'Frais d\'agence',
+                icone: Icons.badge_outlined,
                 description: 'Ajouter des frais d\'agence',
                 active: _avecFraisAgence,
                 onChanged: (val) => setState(() => _avecFraisAgence = val),
@@ -1108,6 +1197,7 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     required String description,
     required bool active,
     required ValueChanged<bool> onChanged,
+    IconData? icone,
     Widget? contenu,
   }) {
     return Container(
@@ -1131,13 +1221,21 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      titre,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.texte,
-                      ),
+                    Row(
+                      children: [
+                        if (icone != null) ...[
+                          Icon(icone, size: 16, color: AppColors.bleuFonce),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          titre,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.texte,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       description,
@@ -1183,38 +1281,61 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
         _typeSelectionne == TypeBien.appartement) {
       champs.add(
         _champTexte(
-          '🛏️ Chambres',
+          'Chambres',
           'Ex: 2',
           _chambresCtrl,
           type: TextInputType.number,
+          icone: Icons.bed_outlined,
+        ),
+      );
+      // un studio ou une chambre n'ont pas de salon séparé
+      champs.add(
+        _champTexte(
+          'Salons',
+          'Ex: 1 (0 si aucun)',
+          _salonsCtrl,
+          type: TextInputType.number,
+          icone: Icons.weekend_outlined,
         ),
       );
     }
     champs.add(
       _champTexte(
-        '🚿 Toilettes',
+        'Toilettes',
         'Ex: 1',
         _toilettesCtrl,
         type: TextInputType.number,
+        icone: Icons.bathtub_outlined,
       ),
     );
     if (_typeSelectionne != TypeBien.chambre) {
       champs.add(
         _champTexte(
-          '🍳 Cuisines',
+          'Cuisines',
           _typeSelectionne == TypeBien.studio ? 'Ex: 1 (kitchenette)' : 'Ex: 1',
           _cuisinesCtrl,
           type: TextInputType.number,
+          icone: Icons.kitchen_outlined,
         ),
       );
     }
 
-    final enfants = <Widget>[];
-    for (var i = 0; i < champs.length; i++) {
-      enfants.add(Expanded(child: champs[i]));
-      if (i < champs.length - 1) enfants.add(const SizedBox(width: 12));
+    // au-delà de 3 champs, on passe sur deux lignes de 2 pour garder des
+    // champs lisibles sur un écran de téléphone
+    final parLigne = champs.length > 3 ? 2 : champs.length;
+    final lignes = <Widget>[];
+    for (var debut = 0; debut < champs.length; debut += parLigne) {
+      final enfants = <Widget>[];
+      for (var i = debut; i < debut + parLigne && i < champs.length; i++) {
+        if (i > debut) enfants.add(const SizedBox(width: 12));
+        enfants.add(Expanded(child: champs[i]));
+      }
+      if (lignes.isNotEmpty) lignes.add(const SizedBox(height: 12));
+      lignes.add(
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: enfants),
+      );
     }
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: enfants);
+    return Column(children: lignes);
   }
 
   Widget _infoFixe(String label, String valeur, String note) {
@@ -1269,9 +1390,9 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     );
   }
 
-  Widget _titreSectionn(String titre) {
-    return Text(
-      titre,
+  Widget _titreSectionn(String titre, {bool obligatoire = false}) {
+    return Text.rich(
+      TextSpan(text: titre, children: [if (obligatoire) _etoile]),
       style: const TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w700,
@@ -1279,6 +1400,12 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
       ),
     );
   }
+
+  /// étoile rouge qui signale un champ obligatoire
+  static const _etoile = TextSpan(
+    text: ' *',
+    style: TextStyle(color: AppColors.erreur),
+  );
 
 
   Widget _champTexte(
@@ -1288,17 +1415,27 @@ class _AddPropertyScreenState extends ConsumerState<AddPropertyScreen> {
     int lignes = 1,
     TextInputType type = TextInputType.text,
     bool actif = true,
+    IconData? icone,
+    bool obligatoire = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-            color: AppColors.texte,
-          ),
+        Row(
+          children: [
+            if (icone != null) ...[
+              Icon(icone, size: 15, color: AppColors.texteLeger),
+              const SizedBox(width: 5),
+            ],
+            Text.rich(
+              TextSpan(text: label, children: [if (obligatoire) _etoile]),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: AppColors.texte,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 6),
         TextField(
